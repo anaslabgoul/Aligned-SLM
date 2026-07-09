@@ -149,6 +149,17 @@ def strip_prompt_prefix(full_text: str, prompt: str) -> str:
     return full_text
 
 
+def normalize_prompt(prompt: str) -> str:
+    return prompt.strip()
+
+
+def trim_at_eos(text: str) -> str:
+    eos_index = text.find("<eos>")
+    if eos_index != -1:
+        return text[:eos_index]
+    return text
+
+
 def main():
     args = parse_args()
     checkpoint_path = resolve_path(args.checkpoint)
@@ -167,23 +178,30 @@ def main():
     model.to(device)
     model.eval()
 
+    normalized_prompt = normalize_prompt(args.prompt)
+    if not normalized_prompt:
+        raise ValueError("Prompt is empty.")
+
     with torch.no_grad():
         generated = model.generate(
-            prompt=args.prompt,
+            prompt=normalized_prompt,
             max_new_tokens=args.max_new_tokens,
             temperature=args.temperature,
             top_k=args.top_k,
         )
 
+    generated = trim_at_eos(generated)
+    generated = generated.replace("<bos>", "")
+
     if args.print_full_output:
         output = generated
     else:
-        output = strip_prompt_prefix(generated, args.prompt)
+        output = strip_prompt_prefix(generated, normalized_prompt)
 
     print(f"Device: {device}")
     print(f"Checkpoint: {checkpoint_path}")
     print("\n=== Prompt ===")
-    print(args.prompt)
+    print(normalized_prompt)
     print("\n=== Output ===")
     print(output)
 

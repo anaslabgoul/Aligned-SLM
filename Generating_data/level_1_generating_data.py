@@ -74,20 +74,17 @@ def _build_int_chain():
     values = [_rand_int() for _ in range(n_terms)]
     ops = [random.choice(["+", "-", "*"]) for _ in range(n_terms - 1)]
 
-    expr = values[0]
     parts = [_format_signed_term(values[0], is_first=True)]
     for op, val in zip(ops, values[1:]):
         if op == "+":
-            expr = expr + val
             parts.append(_format_signed_term(val))
         elif op == "-":
-            expr = expr - val
             parts.append(f"- {val}" if val >= 0 else f"+ {abs(val)}")
         else:
-            expr = expr * val
             parts.append(f"* {val}" if val >= 0 else f"* ({val})")
 
-    return " ".join(parts), expr
+    prob = " ".join(parts)
+    return prob, sp.sympify(prob)
 
 
 def _generate_integer_arithmetic():
@@ -114,11 +111,20 @@ def _generate_integer_arithmetic():
         else:
             prob = f"{a} * ({b})"
 
-    key_words = ["Calculate ", 
-        "Find the result of ", 
-        "Evaluate the expression ",
-        "What is the value of ",
-        "" ]
+    key_words = [
+    "Calculate ",
+    "Find the result of ",
+    "Evaluate the expression ",
+    "What is the value of ",
+    "Solve ",
+    "Compute ",
+    "Determine the value of ",
+    "Work out ",
+    "What does this equal ",
+    "Give the result for ",
+    "Perform the calculation ",
+    ""
+]
     
     prob = random.choice(key_words) + prob
 
@@ -128,11 +134,20 @@ def _generate_integer_arithmetic():
 def _generate_integer_chain():
     """Multi-step integer expression with order of operations."""
     prob, expr = _build_int_chain()
-    key_words = ["Calculate ", 
-        "Find the result of ", 
-        "Evaluate the expression ",
-        "What is the value of ",
-        "" ]
+    key_words = [
+    "Calculate ",
+    "Find the result of ",
+    "Evaluate the expression ",
+    "What is the value of ",
+    "Solve ",
+    "Compute ",
+    "Determine the value of ",
+    "Work out ",
+    "What does this equal ",
+    "Give the result for ",
+    "Perform the calculation ",
+    ""
+]
     
     prob = random.choice(key_words) + prob
     return prob, _format_sympy(expr)
@@ -170,11 +185,20 @@ def _generate_fraction_arithmetic():
         else:
             prob = f"{num1}/{den1} * ({num2}/{den2})"
 
-    key_words = ["Calculate ", 
-        "Find the result of ", 
-        "Evaluate the expression ",
-        "What is the value of ",
-        "" ]
+    key_words = [
+    "Calculate ",
+    "Find the result of ",
+    "Evaluate the expression ",
+    "What is the value of ",
+    "Solve ",
+    "Compute ",
+    "Determine the value of ",
+    "Work out ",
+    "What does this equal ",
+    "Give the result for ",
+    "Perform the calculation ",
+    ""
+]
     
     prob = random.choice(key_words) + prob
 
@@ -209,11 +233,19 @@ def _generate_linear_simplify():
             prob_parts.append(f"- {group}")
 
     problem = f"{' '.join(prob_parts)}"
-    key_words = ["Simplify ", 
-        "Simplify the expression ",
-        "Reduce ",
-        "Reduce the expression ",
-        ""]
+    key_words = [
+    "Simplify ",
+    "Simplify the expression ",
+    "Reduce ",
+    "Reduce the expression ",
+    "Expand and simplify ",
+    "Rewrite in simplest form ",
+    "Combine like terms ",
+    "Simplify the following: ",
+    "Put in simplest form ",
+    "Solve for the simplified version ",
+    ""
+]
 
     problem = random.choice(key_words) + problem
     return problem, _format_sympy(expr)
@@ -250,4 +282,4 @@ def build_dataset(num_samples, filename="math_curriculum.jsonl"):
 
 
 if __name__ == "__main__":
-    build_dataset(100, "math_curriculum.jsonl")
+    build_dataset(1000000, filename="level_1_data.jsonl")

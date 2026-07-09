@@ -197,10 +197,34 @@ def collate_batch(batch: list[torch.Tensor]) -> torch.Tensor:
 def select_device(device_arg: str) -> torch.device:
     if device_arg == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    if device_arg == "cuda" and not torch.cuda.is_available():
+        cuda_build = torch.version.cuda
+        hint = (
+            "Install a CUDA-enabled PyTorch build, e.g.\n"
+            "  pip install torch --index-url https://download.pytorch.org/whl/cu130"
+        )
+        if cuda_build is None:
+            raise RuntimeError(
+                "CUDA was requested but this PyTorch install is CPU-only.\n" + hint
+            )
+        raise RuntimeError(
+            "CUDA was requested but torch.cuda.is_available() is False.\n" + hint
+        )
+
     return torch.device(device_arg)
 
 
-def run_epoch(model, data_loader, optimizer, device, train: bool) -> float:
+def run_epoch(
+    model,
+    data_loader,
+    optimizer,
+    device,
+    train: bool,
+    epoch: int | None = None,
+    total_epochs: int | None = None,
+    progress_updates: int = 0,
+) -> float:
     if train:
         model.train()
     else:
@@ -209,10 +233,18 @@ def run_epoch(model, data_loader, optimizer, device, train: bool) -> float:
     total_loss = 0.0
     total_tokens = 0
     criterion = nn.CrossEntropyLoss()
+    num_batches = len(data_loader)
+    milestone_batches = set()
+    if train and progress_updates > 0 and num_batches > 0:
+        # Create evenly spaced batch milestones and print once per milestone.
+        milestone_batches = {
+            max(1, (num_batches * idx) // progress_updates)
+            for idx in range(1, progress_updates + 1)
+        }
 
     context = torch.enable_grad() if train else torch.no_grad()
     with context:
-        for batch in data_loader:
+        for batch_index, batch in enumerate(data_loader, start=1):
             batch = batch.to(device)
             inputs = batch[:, :-1]
             targets = batch[:, 1:]
@@ -231,6 +263,20 @@ def run_epoch(model, data_loader, optimizer, device, train: bool) -> float:
             token_count = targets.numel()
             total_loss += loss.item() * token_count
             total_tokens += token_count
+
+            if train and batch_index in milestone_batches:
+                running_loss = total_loss / max(total_tokens, 1)
+                if epoch is not None and total_epochs is not None:
+                    print(
+                        f"Epoch {epoch}/{total_epochs} | "
+                        f"batch {batch_index}/{num_batches} | "
+                        f"train loss: {running_loss:.4f}"
+                    )
+                else:
+                    print(
+                        f"Batch {batch_index}/{num_batches} | "
+                        f"train loss: {running_loss:.4f}"
+                    )
 
     return total_loss / max(total_tokens, 1)
 
@@ -302,7 +348,16 @@ def main():
     print(f"Saving best checkpoint to: {best_checkpoint}")
 
     for epoch in range(1, args.epochs + 1):
-        train_loss = run_epoch(model, train_loader, optimizer, device, train=True)
+        train_loss = run_epoch(
+            model,
+            train_loader,
+            optimizer,
+            device,
+            train=True,
+            epoch=epoch,
+            total_epochs=args.epochs,
+            progress_updates=10,
+        )
         test_loss = run_epoch(model, test_loader, optimizer, device, train=False)
 
         print(

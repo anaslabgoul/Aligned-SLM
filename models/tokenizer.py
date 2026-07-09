@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-text = "abcdefghijklmnopqrstuvwxyz0123456789*+-/^=()<> "
+text = "abcdefghijklmnopqrstuvwxyz0123456789*+-/^=()<>;:,.!? "
 
 
 class CharTokenizer(nn.Module):
