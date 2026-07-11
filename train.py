@@ -1,6 +1,7 @@
 import argparse
 import importlib.util
 import json
+import math
 import random
 import sys
 from pathlib import Path
@@ -34,8 +35,38 @@ def parse_args():
         required=True,
         help="Number of training epochs.",
     )
-    parser.add_argument("--batch-size", type=int, default=16)
-    parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--lr", type=float, default=3e-4, help="Peak learning rate.")
+    parser.add_argument(
+        "--min-lr",
+        type=float,
+        default=3e-5,
+        help="Final learning rate the cosine schedule decays to.",
+    )
+    parser.add_argument(
+        "--warmup-steps",
+        type=int,
+        default=500,
+        help="Linear warmup steps before cosine decay.",
+    )
+    parser.add_argument(
+        "--weight-decay",
+        type=float,
+        default=0.1,
+        help="AdamW weight decay (applied to matmul weights only).",
+    )
+    parser.add_argument(
+        "--grad-clip",
+        type=float,
+        default=1.0,
+        help="Max gradient norm (0 disables clipping).",
+    )
+    parser.add_argument(
+        "--beta1", type=float, default=0.9, help="AdamW beta1."
+    )
+    parser.add_argument(
+        "--beta2", type=float, default=0.95, help="AdamW beta2."
+    )
     parser.add_argument("--test-split", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
@@ -215,6 +246,46 @@ def select_device(device_arg: str) -> torch.device:
     return torch.device(device_arg)
 
 
+def configure_optimizer(model, lr: float, weight_decay: float, betas):
+    """AdamW with weight decay applied only to matmul weights.
+
+    LayerNorm weights, biases, and embeddings (all tensors with < 2 dims, plus
+    the embedding tables) are excluded from decay, following common LLM practice.
+    """
+    decay_params = []
+    no_decay_params = []
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+        if param.ndim < 2 or "embedding" in name.lower():
+            no_decay_params.append(param)
+        else:
+            decay_params.append(param)
+
+    param_groups = [
+        {"params": decay_params, "weight_decay": weight_decay},
+        {"params": no_decay_params, "weight_decay": 0.0},
+    ]
+    return torch.optim.AdamW(param_groups, lr=lr, betas=betas)
+
+
+def build_scheduler(optimizer, warmup_steps: int, total_steps: int, peak_lr: float, min_lr: float):
+    """Linear warmup followed by cosine decay from peak_lr down to min_lr."""
+    min_ratio = min_lr / peak_lr if peak_lr > 0 else 0.0
+    total_steps = max(total_steps, 1)
+    warmup_steps = max(min(warmup_steps, total_steps - 1), 0)
+
+    def lr_lambda(step: int) -> float:
+        if warmup_steps > 0 and step < warmup_steps:
+            return (step + 1) / warmup_steps
+        progress = (step - warmup_steps) / max(total_steps - warmup_steps, 1)
+        progress = min(max(progress, 0.0), 1.0)
+        cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+        return min_ratio + (1.0 - min_ratio) * cosine
+
+    return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
+
 def run_epoch(
     model,
     data_loader,
@@ -224,6 +295,8 @@ def run_epoch(
     epoch: int | None = None,
     total_epochs: int | None = None,
     progress_updates: int = 0,
+    scheduler=None,
+    grad_clip: float = 0.0,
 ) -> float:
     if train:
         model.train()
@@ -258,7 +331,11 @@ def run_epoch(
             if train:
                 optimizer.zero_grad()
                 loss.backward()
+                if grad_clip and grad_clip > 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
                 optimizer.step()
+                if scheduler is not None:
+                    scheduler.step()
 
             token_count = targets.numel()
             total_loss += loss.item() * token_count
@@ -266,16 +343,21 @@ def run_epoch(
 
             if train and batch_index in milestone_batches:
                 running_loss = total_loss / max(total_tokens, 1)
+                current_lr = (
+                    scheduler.get_last_lr()[0]
+                    if scheduler is not None
+                    else optimizer.param_groups[0]["lr"]
+                )
                 if epoch is not None and total_epochs is not None:
                     print(
                         f"Epoch {epoch}/{total_epochs} | "
                         f"batch {batch_index}/{num_batches} | "
-                        f"train loss: {running_loss:.4f}"
+                        f"train loss: {running_loss:.4f} | lr: {current_lr:.2e}"
                     )
                 else:
                     print(
                         f"Batch {batch_index}/{num_batches} | "
-                        f"train loss: {running_loss:.4f}"
+                        f"train loss: {running_loss:.4f} | lr: {current_lr:.2e}"
                     )
 
     return total_loss / max(total_tokens, 1)
@@ -338,13 +420,29 @@ def main():
         collate_fn=collate_batch,
     )
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    optimizer = configure_optimizer(
+        model, lr=args.lr, weight_decay=args.weight_decay, betas=(args.beta1, args.beta2)
+    )
+    total_steps = args.epochs * max(len(train_loader), 1)
+    scheduler = build_scheduler(
+        optimizer,
+        warmup_steps=args.warmup_steps,
+        total_steps=total_steps,
+        peak_lr=args.lr,
+        min_lr=args.min_lr,
+    )
     best_test_loss = float("inf")
     best_checkpoint = args.output_dir / "best_model.pt"
 
     print(f"Device: {device}")
     print(f"Training samples: {train_size}")
     print(f"Test samples: {test_size}")
+    print(
+        f"Optimizer: AdamW(betas=({args.beta1}, {args.beta2}), wd={args.weight_decay}) | "
+        f"peak lr: {args.lr:.2e} -> min lr: {args.min_lr:.2e} | "
+        f"warmup: {args.warmup_steps} steps | total: {total_steps} steps | "
+        f"grad clip: {args.grad_clip}"
+    )
     print(f"Saving best checkpoint to: {best_checkpoint}")
 
     for epoch in range(1, args.epochs + 1):
@@ -357,6 +455,8 @@ def main():
             epoch=epoch,
             total_epochs=args.epochs,
             progress_updates=10,
+            scheduler=scheduler,
+            grad_clip=args.grad_clip,
         )
         test_loss = run_epoch(model, test_loader, optimizer, device, train=False)
 

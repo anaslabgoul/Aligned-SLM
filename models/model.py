@@ -7,9 +7,9 @@ from FFN import FFN
 
 text = "abcdefghijklmnopqrstuvwxyz0123456789*+-/^=()<>;:,.!? "
 vocab_size = len(text)
-d_model = 128
-n_heads = 4
-n_layers = 32
+d_model = 384
+n_heads = 6
+n_layers = 12
 max_seq_len = 1024
 dropout = 0.1
 
