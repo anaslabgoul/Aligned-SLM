@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import importlib.util
 import json
@@ -206,7 +208,7 @@ class TextDataset(Dataset):
     def __init__(self, texts: list[str], tokenizer):
         self.samples = []
         for text in texts:
-            tokens = tokenizer.encode(text, add_bos=False, add_eos=False)
+            tokens = tokenizer.encode(text)
             if tokens.numel() > 1:
                 self.samples.append(tokens)
 

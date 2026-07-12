@@ -1,8 +1,11 @@
+import re
+
 import torch
 import torch.nn as nn
 
 
 text = "abcdefghijklmnopqrstuvwxyz0123456789*+-/^=()<>;:,.!? "
+_SPECIAL_MARKER_PATTERN = re.compile(r"<bos>|<eos>", re.IGNORECASE)
 
 
 class CharTokenizer(nn.Module):
@@ -11,6 +14,7 @@ class CharTokenizer(nn.Module):
         self.special_tokens = ["<bos>", "<eos>", "<unk>"]
         unique_chars = list(dict.fromkeys(vocab))
         self.all_chars = self.special_tokens + unique_chars
+        self.vocab_chars = set(unique_chars)
 
         self.stoi = {ch: i for i, ch in enumerate(self.all_chars)}
         self.itos = {i: ch for i, ch in enumerate(self.all_chars)}
@@ -20,14 +24,20 @@ class CharTokenizer(nn.Module):
         self.eos_token_id = self.stoi["<eos>"]
         self.unk_token_id = self.stoi["<unk>"]
 
+    def _strip_embedded_special_tokens(self, text: str) -> str:
+        return _SPECIAL_MARKER_PATTERN.sub("", text)
+
     def encode(self, text, add_bos=True, add_eos=True):
-        text = text.lower()
-        chars = [self.stoi.get(ch, self.unk_token_id) for ch in text]
+        text = self._strip_embedded_special_tokens(text.lower())
+        token_ids = [
+            self.stoi[ch] if ch in self.vocab_chars else self.unk_token_id
+            for ch in text
+        ]
         if add_bos:
-            chars = [self.bos_token_id] + chars
+            token_ids = [self.bos_token_id] + token_ids
         if add_eos:
-            chars = chars + [self.eos_token_id]
-        return torch.tensor(chars, dtype=torch.long)
+            token_ids = token_ids + [self.eos_token_id]
+        return torch.tensor(token_ids, dtype=torch.long)
 
     def decode(self, x):
         if isinstance(x, torch.Tensor):

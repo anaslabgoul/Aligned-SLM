@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 import argparse
 import importlib
 import importlib.util
 import sys
 from pathlib import Path
+from typing import Optional
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -141,23 +145,72 @@ def select_device(device_arg: str) -> torch.device:
     return torch.device(device_arg)
 
 
-def strip_prompt_prefix(full_text: str, prompt: str) -> str:
-    lower_full = full_text.lower()
-    lower_prompt = prompt.lower()
-    if lower_full.startswith(lower_prompt):
-        return full_text[len(prompt) :]
-    return full_text
-
-
 def normalize_prompt(prompt: str) -> str:
     return prompt.strip()
 
 
-def trim_at_eos(text: str) -> str:
-    eos_index = text.find("<eos>")
-    if eos_index != -1:
-        return text[:eos_index]
+def prompt_content(tokenizer, prompt: str) -> str:
+    """Return the lowercased prompt text after stripping literal <bos>/<eos> markers."""
+    prompt_ids = tokenizer.encode(prompt, add_bos=True, add_eos=False)
+    return tokenizer.decode(prompt_ids[1:].tolist())
+
+
+def sample_next_token(
+    logits: torch.Tensor,
+    temperature: float,
+    top_k: Optional[int],
+) -> int:
+    if temperature == 0:
+        return int(torch.argmax(logits, dim=-1).item())
+
+    logits = logits / temperature
+    if top_k is not None:
+        values, _ = torch.topk(logits, top_k)
+        logits = torch.where(logits < values[-1], torch.tensor(float("-inf")), logits)
+
+    probs = F.softmax(logits, dim=-1)
+    return int(torch.multinomial(probs, num_samples=1).item())
+
+
+def generate_until_eos(
+    model,
+    prompt: str,
+    max_new_tokens: int,
+    temperature: float,
+    top_k: Optional[int],
+) -> list[int]:
+    tokenizer = model.tokenizer
+    token_ids = tokenizer.encode(prompt, add_bos=True, add_eos=False).tolist()
+
+    for _ in range(max_new_tokens):
+        x = torch.tensor([token_ids], dtype=torch.long, device=model.device)
+        logits = model(x)[:, -1, :].squeeze(0)
+        next_token_id = sample_next_token(logits, temperature, top_k)
+        token_ids.append(next_token_id)
+
+        if next_token_id == tokenizer.eos_token_id:
+            break
+        if len(token_ids) >= model.max_seq_len:
+            break
+
+    return token_ids
+
+
+def format_token_ids(tokenizer, token_ids: list[int]) -> str:
+    eos_id = tokenizer.eos_token_id
+    if eos_id in token_ids:
+        token_ids = token_ids[: token_ids.index(eos_id)]
+
+    text = tokenizer.decode(token_ids)
+    if text.startswith("<bos>"):
+        text = text[len("<bos>") :]
     return text
+
+
+def strip_prompt_prefix(full_text: str, prompt_content_text: str) -> str:
+    if full_text.startswith(prompt_content_text):
+        return full_text[len(prompt_content_text) :]
+    return full_text
 
 
 def main():
@@ -182,21 +235,23 @@ def main():
     if not normalized_prompt:
         raise ValueError("Prompt is empty.")
 
+    prompt_text = prompt_content(model.tokenizer, normalized_prompt)
+
     with torch.no_grad():
-        generated = model.generate(
+        token_ids = generate_until_eos(
+            model=model,
             prompt=normalized_prompt,
             max_new_tokens=args.max_new_tokens,
             temperature=args.temperature,
             top_k=args.top_k,
         )
 
-    generated = trim_at_eos(generated)
-    generated = generated.replace("<bos>", "")
+    generated = format_token_ids(model.tokenizer, token_ids)
 
     if args.print_full_output:
         output = generated
     else:
-        output = strip_prompt_prefix(generated, normalized_prompt)
+        output = strip_prompt_prefix(generated, prompt_text)
 
     print(f"Device: {device}")
     print(f"Checkpoint: {checkpoint_path}")
