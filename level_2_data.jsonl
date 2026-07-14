@@ -1,0 +1,100 @@
+{"text": "<bos>Problem: (-9*x - 6) - (-x - 1); step: -9*x - 6 + x + 1; step: -8*x - 5<eos>"}
+{"text": "<bos>Problem: Expand the expression (4*y - 9)^2; step: (4*y - 9)*(4*y - 9); step: 16*y^2 - 72*y + 81<eos>"}
+{"text": "<bos>Problem: Expand and simplify (-10*x - 9)^2; step: (-10*x - 9)*(-10*x - 9); step: 100*x^2 + 180*x + 81<eos>"}
+{"text": "<bos>Problem: Expand (5*x - 6)*-6; step: -6*5*x + 6*6; step: -30*x + 36<eos>"}
+{"text": "<bos>Problem: (3*x^2 - 7*x - 6) + (-9*x^2 - 5*x - 3); step: 3*x^2 - 7*x - 6 - 9*x^2 - 5*x - 3; step: -6*x^2 - 12*x - 9<eos>"}
+{"text": "<bos>Problem: Expand (7*x + 2)*2; step: 2*7*x + 2*2; step: 14*x + 4<eos>"}
+{"text": "<bos>Problem: Combine (-8*x^2 + x) + (2*x^2 + 8*x - 8); step: -8*x^2 + x + 2*x^2 + 8*x - 8; step: -6*x^2 + 9*x - 8<eos>"}
+{"text": "<bos>Problem: Evaluate the expression 2/5 + 3 * (-3); step: 2/5 - 9; step: 2/5 - 45/5; step: -43/5; step: -43/5<eos>"}
+{"text": "<bos>Problem: Find x in x - 9 = -10; step: x = -10 + 9; step: x = -1<eos>"}
+{"text": "<bos>Problem: Evaluate the expression -8 * (-10/9); step: 80/9<eos>"}
+{"text": "<bos>Problem: What is the value of -5/6 * 3; step: -15/6; step: -5/2<eos>"}
+{"text": "<bos>Problem: -5*y = 40; step: y = 40/-5; step: y = -8<eos>"}
+{"text": "<bos>Problem: Expand and simplify (3*x + 9)^2; step: (3*x + 9)*(3*x + 9); step: 9*x^2 + 54*x + 81<eos>"}
+{"text": "<bos>Problem: Multiply out (-8*x - 2)*6; step: -6*8*x - 6*2; step: -48*x - 12<eos>"}
+{"text": "<bos>Problem: Solve 1 - 5/2; step: 2/2 - 5/2; step: -3/2<eos>"}
+{"text": "<bos>Problem: Determine the value of -1/3 + 1/6; step: -2/6 + 1/6; step: -1/6<eos>"}
+{"text": "<bos>Problem: Add together (-8*y - 5) - (-5*y^2 - 2*y - 5); step: -8*y - 5 + 5*y^2 + 2*y + 5; step: 5*y^2 - 6*y<eos>"}
+{"text": "<bos>Problem: Calculate -5/3 * 7 + 7; step: -35/3 + 7; step: -35/3 + 21/3; step: -14/3; step: -14/3<eos>"}
+{"text": "<bos>Problem: Multiply out (2*y - 5)*9; step: 9*2*y - 9*5; step: 18*y - 45<eos>"}
+{"text": "<bos>Problem: (5*x)^2; step: (5*x)*(5*x); step: 25*x^2<eos>"}
+{"text": "<bos>Problem: Expand the expression (-10*y^2 + 4*y - 3)*7; step: -7*10*y^2 + 7*4*y - 7*3; step: -70*y^2 + 28*y - 21<eos>"}
+{"text": "<bos>Problem: Work out -1 * (-2); step: 2/1; step: 2<eos>"}
+{"text": "<bos>Problem: Expand and simplify (-9*x + 4)^2; step: (-9*x + 4)*(-9*x + 4); step: 81*x^2 - 72*x + 16<eos>"}
+{"text": "<bos>Problem: y - 4 = 3; step: y = 3 + 4; step: y = 7<eos>"}
+{"text": "<bos>Problem: What is the value of -9 * (-1/3) - 8; step: 3 - 8; step: -5<eos>"}
+{"text": "<bos>Problem: Expand the expression (-4*y - 8)*1; step: -1*4*y - 1*8; step: -4*y - 8<eos>"}
+{"text": "<bos>Problem: Add together (-10*x^2 - 6*x + 5) - (5*x + 1); step: -10*x^2 - 6*x + 5 - 5*x - 1; step: -10*x^2 - 11*x + 4<eos>"}
+{"text": "<bos>Problem: Expand -1*(-6*x^2 - 10*x - 4); step: 1*6*x^2 + 1*10*x + 1*4; step: 6*x^2 + 10*x + 4<eos>"}
+{"text": "<bos>Problem: What is x in x/1 = -9; step: x = -9*1; step: x = -9<eos>"}
+{"text": "<bos>Problem: x - 5 = 0; step: x = 0 + 5; step: x = 5<eos>"}
+{"text": "<bos>Problem: Expand the expression (2*y + 9)^2; step: (2*y + 9)*(2*y + 9); step: 4*y^2 + 36*y + 81<eos>"}
+{"text": "<bos>Problem: What is the value of -3 * (-3/7); step: 9/7<eos>"}
+{"text": "<bos>Problem: Expand and simplify (5*x - 4)^2; step: (5*x - 4)*(5*x - 4); step: 25*x^2 - 40*x + 16<eos>"}
+{"text": "<bos>Problem: Multiply out (-8*x + 10)^2; step: (-8*x + 10)*(-8*x + 10); step: 64*x^2 - 160*x + 100<eos>"}
+{"text": "<bos>Problem: y - 4 = -2; step: y = -2 + 4; step: y = 2<eos>"}
+{"text": "<bos>Problem: Solve 4 * (-1/4) - 7; step: -1 - 7; step: -8<eos>"}
+{"text": "<bos>Problem: Write the expansion of (-3*x - 5)^2; step: (-3*x - 5)*(-3*x - 5); step: 9*x^2 + 30*x + 25<eos>"}
+{"text": "<bos>Problem: Find the sum of (7*y + 6) - (7*y^2 + 2*y - 9); step: 7*y + 6 - 7*y^2 - 2*y + 9; step: -7*y^2 + 5*y + 15<eos>"}
+{"text": "<bos>Problem: Solve the equation x/10 = 1; step: x = 1*10; step: x = 10<eos>"}
+{"text": "<bos>Problem: Expand (-10*x + 9)^2; step: (-10*x + 9)*(-10*x + 9); step: 100*x^2 - 180*x + 81<eos>"}
+{"text": "<bos>Problem: Determine x if x/9 = 1; step: x = 1*9; step: x = 9<eos>"}
+{"text": "<bos>Problem: (-4*y + 8)^2; step: (-4*y + 8)*(-4*y + 8); step: 16*y^2 - 64*y + 64<eos>"}
+{"text": "<bos>Problem: Expand (-2*x - 7)*-4; step: 4*2*x + 4*7; step: 8*x + 28<eos>"}
+{"text": "<bos>Problem: Expand 7*(9*y^2 - 4*y - 2); step: 7*9*y^2 - 7*4*y - 7*2; step: 63*y^2 - 28*y - 14<eos>"}
+{"text": "<bos>Problem: Use the distributive property on (6*x - 2)*-9; step: -9*6*x + 9*2; step: -54*x + 18<eos>"}
+{"text": "<bos>Problem: What does this equal 3 + 5/8; step: 24/8 + 5/8; step: 29/8<eos>"}
+{"text": "<bos>Problem: (5*y^2 - 9*y - 7) - (-7*y + 7); step: 5*y^2 - 9*y - 7 + 7*y - 7; step: 5*y^2 - 2*y - 14<eos>"}
+{"text": "<bos>Problem: (-x - 1)*-9; step: 9*x + 9*1; step: 9*x + 9<eos>"}
+{"text": "<bos>Problem: Compute -6/7 * (-2); step: 12/7<eos>"}
+{"text": "<bos>Problem: (-5*x + 7)^2; step: (-5*x + 7)*(-5*x + 7); step: 25*x^2 - 70*x + 49<eos>"}
+{"text": "<bos>Problem: Expand (9*x + 5)^2; step: (9*x + 5)*(9*x + 5); step: 81*x^2 + 90*x + 25<eos>"}
+{"text": "<bos>Problem: Write the expansion of (6*x - 2)^2; step: (6*x - 2)*(6*x - 2); step: 36*x^2 - 24*x + 4<eos>"}
+{"text": "<bos>Problem: y + 4 = -5; step: y = -5 - 4; step: y = -9<eos>"}
+{"text": "<bos>Problem: Add together (-y + 5) - (3*y + 6); step: -y + 5 - 3*y - 6; step: -4*y - 1<eos>"}
+{"text": "<bos>Problem: Compute 10 - 3 * 4/3; step: 10 - 4; step: 6<eos>"}
+{"text": "<bos>Problem: Sum (-y) - (-2*y^2 + 7*y); step: -y + 2*y^2 - 7*y; step: 2*y^2 - 8*y<eos>"}
+{"text": "<bos>Problem: Solve 6 * 9/7; step: 54/7<eos>"}
+{"text": "<bos>Problem: Calculate 3 * 1 + 1/2; step: 3 + 1/2; step: 6/2 + 1/2; step: 7/2<eos>"}
+{"text": "<bos>Problem: Solve 9 - 4; step: 5<eos>"}
+{"text": "<bos>Problem: Find the sum of (-x^2 - 5*x + 5) + (4*x^2 - 8*x - 1); step: -x^2 - 5*x + 5 + 4*x^2 - 8*x - 1; step: 3*x^2 - 13*x + 4<eos>"}
+{"text": "<bos>Problem: Find the sum of (7*y^2 - 2*y + 6) - (-9*y - 7); step: 7*y^2 - 2*y + 6 + 9*y + 7; step: 7*y^2 + 7*y + 13<eos>"}
+{"text": "<bos>Problem: Use the distributive property on (10*y - 9)*1; step: 1*10*y - 1*9; step: 10*y - 9<eos>"}
+{"text": "<bos>Problem: Determine y if y + 8 = 7; step: y = 7 - 8; step: y = -1<eos>"}
+{"text": "<bos>Problem: Solve for y: -9*y = -54; step: y = -54/-9; step: y = 6<eos>"}
+{"text": "<bos>Problem: Find the sum of (5*y^2 + 8*y - 6) + (6*y + 9); step: 5*y^2 + 8*y - 6 + 6*y + 9; step: 5*y^2 + 14*y + 3<eos>"}
+{"text": "<bos>Problem: Combine (-10*x + 4) - (-10*x + 3); step: -10*x + 4 + 10*x - 3; step: 1<eos>"}
+{"text": "<bos>Problem: What is x in x/5 = 1/5; step: x = 1/5*5; step: x = 1<eos>"}
+{"text": "<bos>Problem: x - 7 = 1; step: x = 1 + 7; step: x = 8<eos>"}
+{"text": "<bos>Problem: Add (5*y - 5) + (-10*y^2 + 8*y - 4); step: 5*y - 5 - 10*y^2 + 8*y - 4; step: -10*y^2 + 13*y - 9<eos>"}
+{"text": "<bos>Problem: Expand the expression (8*x^2 + x - 8)*-2; step: -2*8*x^2 - 2*x + 2*8; step: -16*x^2 - 2*x + 16<eos>"}
+{"text": "<bos>Problem: Combine (9*y - 1) + (6*y - 6); step: 9*y - 1 + 6*y - 6; step: 15*y - 7<eos>"}
+{"text": "<bos>Problem: Find the sum of (-3*y + 7) - (-4*y^2 + 5*y + 3); step: -3*y + 7 + 4*y^2 - 5*y - 3; step: 4*y^2 - 8*y + 4<eos>"}
+{"text": "<bos>Problem: Multiply out -10*(2*y^2 - 4*y - 9); step: -10*2*y^2 + 10*4*y + 10*9; step: -20*y^2 + 40*y + 90<eos>"}
+{"text": "<bos>Problem: Expand -9*(9*y^2 - 6*y + 6); step: -9*9*y^2 + 9*6*y - 9*6; step: -81*y^2 + 54*y - 54<eos>"}
+{"text": "<bos>Problem: Expand and simplify (-4*y - 7)^2; step: (-4*y - 7)*(-4*y - 7); step: 16*y^2 + 56*y + 49<eos>"}
+{"text": "<bos>Problem: Find the sum of (-5*x - 4) + (8*x + 3); step: -5*x - 4 + 8*x + 3; step: 3*x - 1<eos>"}
+{"text": "<bos>Problem: Add (-5*y - 10) + (y^2 - 8*y - 3); step: -5*y - 10 + y^2 - 8*y - 3; step: y^2 - 13*y - 13<eos>"}
+{"text": "<bos>Problem: What is y in y - 3 = 6; step: y = 6 + 3; step: y = 9<eos>"}
+{"text": "<bos>Problem: Use the distributive property on (-2*x^2 - 3*x + 3)*5; step: -5*2*x^2 - 5*3*x + 5*3; step: -10*x^2 - 15*x + 15<eos>"}
+{"text": "<bos>Problem: Work out 2 * 9/10 + 1; step: 9/5 + 1; step: 9/5 + 5/5; step: 14/5; step: 14/5<eos>"}
+{"text": "<bos>Problem: Distribute 1*(8*x + 6); step: 1*8*x + 1*6; step: 8*x + 6<eos>"}
+{"text": "<bos>Problem: Expand the expression (-10*y + 7)^2; step: (-10*y + 7)*(-10*y + 7); step: 100*y^2 - 140*y + 49<eos>"}
+{"text": "<bos>Problem: Expand the expression (-3*x - 2)^2; step: (-3*x - 2)*(-3*x - 2); step: 9*x^2 + 12*x + 4<eos>"}
+{"text": "<bos>Problem: Give the result for 6 + 1/3 * (-9); step: 6 - 3; step: 3<eos>"}
+{"text": "<bos>Problem: Add (9*x^2 + 8*x - 3) + (-x^2 - 10*x + 5); step: 9*x^2 + 8*x - 3 - x^2 - 10*x + 5; step: 8*x^2 - 2*x + 2<eos>"}
+{"text": "<bos>Problem: Solve for y: y/1 = 1; step: y = 1*1; step: y = 1<eos>"}
+{"text": "<bos>Problem: Sum (9*y + 4) - (-6*y - 5); step: 9*y + 4 + 6*y + 5; step: 15*y + 9<eos>"}
+{"text": "<bos>Problem: Write the expansion of (-9*x - 10)^2; step: (-9*x - 10)*(-9*x - 10); step: 81*x^2 + 180*x + 100<eos>"}
+{"text": "<bos>Problem: Expand the expression (-x^2 - x + 9)*-5; step: 5*x^2 + 5*x - 5*9; step: 5*x^2 + 5*x - 45<eos>"}
+{"text": "<bos>Problem: Find y in 5*y = 10; step: y = 10/5; step: y = 2<eos>"}
+{"text": "<bos>Problem: Find x in 10*x = 30; step: x = 30/10; step: x = 3<eos>"}
+{"text": "<bos>Problem: Expand (8*y^2 + 10)*1; step: 1*8*y^2 + 1*10; step: 8*y^2 + 10<eos>"}
+{"text": "<bos>Problem: Work out 5/2 * 3 - 9; step: 15/2 - 9; step: 15/2 - 18/2; step: -3/2; step: -3/2<eos>"}
+{"text": "<bos>Problem: Solve the equation y + 4 = -6; step: y = -6 - 4; step: y = -10<eos>"}
+{"text": "<bos>Problem: Add (9*y^2 - 7*y - 1) + (6*y - 9); step: 9*y^2 - 7*y - 1 + 6*y - 9; step: 9*y^2 - y - 10<eos>"}
+{"text": "<bos>Problem: Add together (-10*x + 10) + (-6*x^2 - 4*x - 10); step: -10*x + 10 - 6*x^2 - 4*x - 10; step: -6*x^2 - 14*x<eos>"}
+{"text": "<bos>Problem: (-5*y^2 - 5) - (4*y^2 - 6); step: -5*y^2 - 5 - 4*y^2 + 6; step: -9*y^2 + 1<eos>"}
+{"text": "<bos>Problem: Sum (-4*x + 7) + (2*x - 3); step: -4*x + 7 + 2*x - 3; step: -2*x + 4<eos>"}
+{"text": "<bos>Problem: (-10*x - 2) - (-4*x^2 - 10*x - 10); step: -10*x - 2 + 4*x^2 + 10*x + 10; step: 4*x^2 + 8<eos>"}
+{"text": "<bos>Problem: What does this equal 3/10 * 3/7 + 5; step: 9/70 + 5; step: 9/70 + 350/70; step: 359/70; step: 359/70<eos>"}

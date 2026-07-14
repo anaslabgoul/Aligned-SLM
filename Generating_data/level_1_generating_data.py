@@ -6,7 +6,7 @@ via SymPy; coefficients and constants in [-100, 100]; linear terms use x or y, d
 
 Each sample is emitted as:
 
-    <bos>Problem: ...; step 1: ...; step 2: ...; Answer: ...<eos>
+    <bos>Problem: ...; step: ...; step: ...<eos>
 
 The number of steps is problem-dependent — a single integer operation has *no*
 intermediate steps, while multi-step problems expose as many steps as they need:
@@ -15,7 +15,8 @@ intermediate steps, while multi-step problems expose as many steps as they need:
 2. Integer chains       — multi-step expression; one step per operation, resolving
                           multiplication (higher precedence) before +/- .
 3. Fraction arithmetic  — rewrite over a common denominator, combine, then reduce.
-4. Linear simplify      — distribute/remove parentheses, then combine like terms.
+4. Fraction simplify    — reduce a single fraction to lowest terms.
+5. Linear simplify      — distribute/remove parentheses, then combine like terms.
 
 Every generated sample is verified with SymPy: each intermediate step and the final
 answer must evaluate to the same value as the original expression, otherwise the
@@ -65,6 +66,17 @@ SIMPLIFY_KEYWORDS = [
     "",
 ]
 
+FRACTION_SIMPLIFY_KEYWORDS = [
+    "Simplify ",
+    "Reduce ",
+    "Write in lowest terms ",
+    "Simplify the fraction ",
+    "Reduce the fraction ",
+    "Put in simplest form ",
+    "Express in lowest terms ",
+    "",
+]
+
 
 def _rand_int(low=MIN_INT, high=MAX_INT, exclude_zero=False):
     while True:
@@ -77,6 +89,12 @@ def _format_sympy(expr):
     """Render a sympy expression in the project's token vocabulary."""
     simplified = sp.simplify(expr)
     return sp.sstr(simplified, order="lex")
+
+
+def _format_fraction(num, den):
+    if num < 0:
+        return f"-{abs(num)}/{den}"
+    return f"{num}/{den}"
 
 
 def _format_binomial(a, b, var_name):
@@ -211,12 +229,15 @@ def _generate_fraction_arithmetic():
     num1, den1 = _rand_int(exclude_zero=True), _rand_int(low=1, high=10, exclude_zero=True)
     num2, den2 = _rand_int(exclude_zero=True), _rand_int(low=1, high=10, exclude_zero=True)
 
+    frac1 = _format_fraction(num1, den1)
+    frac2 = _format_fraction(num2, den2)
+
     if op == "+":
-        prob = f"{num1}/{den1} + {num2}/{den2}" if num2 >= 0 else f"{num1}/{den1} - {abs(num2)}/{den2}"
+        prob = f"{frac1} + {frac2}" if num2 >= 0 else f"{frac1} - {abs(num2)}/{den2}"
     elif op == "-":
-        prob = f"{num1}/{den1} - {num2}/{den2}" if num2 >= 0 else f"{num1}/{den1} + {abs(num2)}/{den2}"
+        prob = f"{frac1} - {frac2}" if num2 >= 0 else f"{frac1} + {abs(num2)}/{den2}"
     else:
-        prob = f"{num1}/{den1} * {num2}/{den2}" if num2 >= 0 else f"{num1}/{den1} * ({num2}/{den2})"
+        prob = f"{frac1} * {frac2}" if num2 >= 0 else f"{frac1} * ({frac2})"
 
     value = (
         sp.Rational(num1, den1) + sp.Rational(num2, den2)
@@ -230,7 +251,7 @@ def _generate_fraction_arithmetic():
     steps = []
     if op == "*":
         # Multiply straight across, then reduce if the product is not already lowest terms.
-        product = f"{num1 * num2}/{den1 * den2}"
+        product = _format_fraction(num1 * num2, den1 * den2)
         if product != answer:
             steps.append(product)
     else:
@@ -240,19 +261,42 @@ def _generate_fraction_arithmetic():
         # Step 1 (only if a rewrite is actually needed): put both over the common denominator.
         if den1 != lcd or den2 != lcd:
             if op == "+":
-                tail = f"+ {scaled2}/{lcd}" if scaled2 >= 0 else f"- {abs(scaled2)}/{lcd}"
+                tail = (
+                    f"+ {_format_fraction(scaled2, lcd)}"
+                    if scaled2 >= 0
+                    else f"- {_format_fraction(abs(scaled2), lcd)}"
+                )
             else:
-                tail = f"- {scaled2}/{lcd}" if scaled2 >= 0 else f"+ {abs(scaled2)}/{lcd}"
-            steps.append(f"{scaled1}/{lcd} {tail}")
+                tail = (
+                    f"- {_format_fraction(scaled2, lcd)}"
+                    if scaled2 >= 0
+                    else f"+ {_format_fraction(abs(scaled2), lcd)}"
+                )
+            steps.append(f"{_format_fraction(scaled1, lcd)} {tail}")
 
         # Step 2 (only if it differs from the reduced answer): combine the numerators.
         combined = scaled1 + scaled2 if op == "+" else scaled1 - scaled2
-        combined_str = f"{combined}/{lcd}"
+        combined_str = _format_fraction(combined, lcd)
         if combined_str != answer:
             steps.append(combined_str)
 
     prob = random.choice(ARITHMETIC_KEYWORDS) + prob
     return prob, steps, answer, value
+
+
+def _generate_fraction_simplify():
+    """Reduce a single fraction to lowest terms."""
+    factor = random.randint(2, 6)
+    reduced_num = _rand_int(exclude_zero=True)
+    reduced_den = _rand_int(low=2, high=10, exclude_zero=True)
+
+    num = reduced_num * factor
+    den = reduced_den * factor
+    value = sp.Rational(reduced_num, reduced_den)
+    answer = _format_sympy(value)
+
+    prob = random.choice(FRACTION_SIMPLIFY_KEYWORDS) + _format_fraction(num, den)
+    return prob, [], answer, value
 
 
 def _generate_linear_simplify():
@@ -317,6 +361,7 @@ def generate_level_1():
         _generate_integer_arithmetic,
         _generate_integer_chain,
         _generate_fraction_arithmetic,
+        _generate_fraction_simplify,
         _generate_linear_simplify,
     ]
 
@@ -330,18 +375,20 @@ def generate_level_1():
 
 
 def _format_sample(prob, steps, answer):
-    """Assemble one training string in the '<bos>Problem: ...; step i: ...; Answer: ...<eos>' shape."""
+    """Assemble one training string in the '<bos>Problem: ...; step: ...<eos>' shape."""
     segments = [f"Problem: {prob}"]
-    segments += [f"step {index}: {step}" for index, step in enumerate(steps, start=1)]
-    segments.append(f"Answer: {answer}")
+    segments += [f"step: {step}" for step in steps]
+    segments.append(f"step: {answer}")
     return "<bos>" + "; ".join(segments) + "<eos>"
 
 
-def build_dataset(num_samples, filename="math_curriculum.jsonl"):
+def build_dataset(num_samples, filename="math_curriculum.jsonl", append=False):
     """Generates the dataset and saves it as a JSON Lines file."""
-    print(f"Generating {num_samples} samples...")
+    mode = "a" if append else "w"
+    action = "Appending" if append else "Generating"
+    print(f"{action} {num_samples} samples...")
 
-    with open(filename, "w", encoding="utf-8") as f:
+    with open(filename, mode, encoding="utf-8") as f:
         for _ in range(num_samples):
             prob, steps, answer = generate_level_1()
             formatted_text = _format_sample(prob, steps, answer)
@@ -351,5 +398,22 @@ def build_dataset(num_samples, filename="math_curriculum.jsonl"):
     print(f"Done! Dataset saved to {filename}")
 
 
+def append_fraction_simplify_samples(num_samples, filename="level_1_data.jsonl"):
+    """Append only fraction-simplification samples to an existing dataset."""
+    print(f"Appending {num_samples} fraction-simplification samples...")
+
+    written = 0
+    with open(filename, "a", encoding="utf-8") as handle:
+        while written < num_samples:
+            prob, steps, answer, value = _generate_fraction_simplify()
+            if not _verify(value, steps, answer):
+                continue
+            formatted_text = _format_sample(prob, steps, answer)
+            handle.write(json.dumps({"text": formatted_text}) + "\n")
+            written += 1
+
+    print(f"Done! Fraction-simplification samples appended to {filename}")
+
+
 if __name__ == "__main__":
-    build_dataset(1000000, filename="level_1_data.jsonl")
+    build_dataset(1000, filename="level_1_data.jsonl")
