@@ -3,4 +3,5 @@ __pycache__/
 *.py[cod]
 checkpoints/
 .ipynb_checkpoints/
+*.jsonl
 .env
