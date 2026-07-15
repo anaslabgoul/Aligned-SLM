@@ -37,8 +37,10 @@ pip install torch sympy
 Data is produced as JSON Lines (`.jsonl`). Each line has this shape:
 
 ```json
-{"text": "<bos>Problem: ...; Answer: ...<eos>"}
+{"text": "<bos>Problem: ...; step: ...; step: ...<eos>"}
 ```
+
+The final answer is the text after the **last** `step:`.
 
 
 
@@ -324,6 +326,110 @@ python prompt.py `
 
 
 
+## Evaluate a model per-operation
+
+`evaluate_model.py` measures how accurately a checkpoint answers each **operation
+type** within a level, so you can see exactly where the model gets things wrong.
+For a chosen level it generates fresh problems separately per operation, feeds each
+to the model, reads the model's final answer (the text after the last `step:`),
+compares it to the ground truth with **SymPy** (so `7 + 2*x` and `2*x + 7` count as
+equal), and reports the percentage correct per operation.
+
+
+
+### Basic evaluation
+
+```powershell
+python evaluate_model.py --level 1 --num-samples 50
+```
+
+This generates 50 problems for **each** Level 1 operation and prints a table:
+
+```text
+=== Evaluation: level 1 | 50 samples/operation | greedy ===
+operation               correct   total   accuracy
+--------------------------------------------------
+integer_arithmetic           47      50      94.0%
+integer_chain                41      50      82.0%
+fraction_arithmetic          38      50      76.0%
+fraction_simplify            44      50      88.0%
+linear_simplify              36      50      72.0%
+--------------------------------------------------
+overall                     206     250      82.4%
+```
+
+
+
+### Operations per level
+
+| Level | Operations |
+| ----- | ---------- |
+| 1     | `integer_arithmetic`, `integer_chain`, `fraction_arithmetic`, `fraction_simplify`, `linear_simplify` |
+| 2     | `polynomial_expand`, `polynomial_sum`, `distributive`, `mixed_chain`, `linear_solve` |
+
+
+
+### See where the model fails
+
+Print example wrong answers per operation with `--show-errors`:
+
+```powershell
+python evaluate_model.py --level 1 --num-samples 100 --show-errors 3
+```
+
+```text
+--- Example errors: fraction_arithmetic ---
+  Problem  : Find the result of 17/9 * (-69/7)
+  Expected : -391/21
+  Predicted: -1213/63
+```
+
+
+
+### Evaluate specific operations only
+
+```powershell
+python evaluate_model.py --level 1 --num-samples 200 --operations integer_chain fraction_simplify
+```
+
+
+
+### Save a JSON report
+
+```powershell
+python evaluate_model.py --level 2 --num-samples 100 --save-report report.json
+```
+
+
+
+### Evaluation arguments
+
+
+| Flag                  | Default                     | Description                                        |
+| --------------------- | --------------------------- | -------------------------------------------------- |
+| `--model`             | `models/model.py`           | Model module path                                  |
+| `--checkpoint`        | `checkpoints/best_model.pt` | Checkpoint to evaluate                             |
+| `--level`             | `1`                         | Curriculum level (`1` or `2`)                      |
+| `-n`, `--num-samples` | `50`                        | Problems generated and evaluated **per operation** |
+| `--operations`        | all in the level            | Subset of operation names to evaluate              |
+| `--max-new-tokens`    | `200`                       | Max tokens generated per problem                   |
+| `--temperature`       | `0.0`                       | Sampling temperature (`0` = greedy, recommended)   |
+| `--top-k`             | none                        | Top-k cutoff (only used when temperature > 0)      |
+| `--device`            | `auto`                      | `auto`, `cpu`, or `cuda`                           |
+| `--seed`              | `42`                        | Seed for reproducible problem generation           |
+| `--show-errors`       | `0`                         | Print up to N example wrong answers per operation  |
+| `--save-report`       | none                        | Write a JSON report to this path                   |
+
+
+> **Note:** the checkpoint must match the architecture currently declared in
+> `models/model.py` (same `d_model` / `n_heads` / `n_layers`). If it doesn't, the
+> script stops with a clear message — retrain with the current `model.py`, or
+> restore `model.py` to the checkpoint's architecture.
+
+---
+
+
+
 ## Full workflow example
 
 ```powershell
@@ -337,7 +443,10 @@ python -c "from Generating_data.level_1_generating_data import build_dataset; bu
 python train.py --model models/model.py --data Generating_data/math_curriculum.jsonl --epochs 20 --batch-size 8
 
 # 4. Run a prompt from the best checkpoint
-python prompt.py --prompt "<bos>Problem: 9 * 6; Answer:"
+python prompt.py --prompt "<bos>Problem: 9 * 6; step:"
+
+# 5. Evaluate accuracy per operation to see where it fails
+python evaluate_model.py --level 1 --num-samples 100 --show-errors 3
 ```
 
 ---
@@ -355,5 +464,7 @@ python prompt.py --prompt "<bos>Problem: 9 * 6; Answer:"
 | `train_model.py`                             | Continue training from a checkpoint  |
 | `models/model.py`                            | Model definition and hyperparameters |
 | `checkpoints/best_model.pt`                  | Saved best model after training      |
+| `prompt.py`                                  | Generate text from a trained checkpoint |
+| `evaluate_model.py`                          | Per-operation accuracy evaluation    |
 
 
