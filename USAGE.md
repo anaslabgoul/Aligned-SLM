@@ -168,6 +168,96 @@ checkpoints/best_model.pt
 
 ---
 
+## Continue training from a checkpoint
+
+Use `train_model.py` to keep training a model that was already saved with `train.py` (or a previous run of `train_model.py`). It loads the weights from a `.pt` checkpoint, then trains on a new dataset for more epochs.
+
+Required arguments (everything from `train.py`, plus `--checkpoint`):
+
+| Argument       | Description                                              |
+| -------------- | -------------------------------------------------------- |
+| `--model`      | Path to the model module (e.g. `models/model.py`)        |
+| `--checkpoint` | Path to a saved checkpoint (e.g. `checkpoints/model_1.pt`) |
+| `--data`       | Path to a `.jsonl` or `.json` dataset                    |
+| `--epochs`     | Number of additional training epochs                     |
+
+The checkpoint must contain a `model_state_dict` key (same format as `checkpoints/best_model.pt`).
+
+### Basic continued training
+
+**Windows (PowerShell)**
+
+```powershell
+python train_model.py `
+  --model models/model.py `
+  --checkpoint checkpoints/model_1.pt `
+  --data level_1_data.jsonl `
+  --epochs 10
+```
+
+**Linux / macOS**
+
+```bash
+python train_model.py \
+  --model models/model.py \
+  --checkpoint checkpoints/model_1.pt \
+  --data level_1_data.jsonl \
+  --epochs 10
+```
+
+### Continued training with extra options
+
+```bash
+python train_model.py \
+  --model models/model.py \
+  --checkpoint checkpoints/model_1.pt \
+  --data level_1_data.jsonl \
+  --epochs 20 \
+  --batch-size 16 \
+  --lr 3e-4 \
+  --test-split 0.04 \
+  --output-dir checkpoints \
+  --device cuda
+```
+
+To avoid overwriting an earlier best checkpoint, set a different output directory or filename:
+
+```bash
+python train_model.py \
+  --model models/model.py \
+  --checkpoint checkpoints/model_1.pt \
+  --data level_1_1_data.jsonl \
+  --epochs 20 \
+  --output-dir checkpoints
+```
+
+Then rename the saved file if needed, e.g. `checkpoints/best_model.pt` → `checkpoints/model_2.pt`.
+
+### Optional flags
+
+Same as `train.py`:
+
+| Flag             | Default       | Description                         |
+| ---------------- | ------------- | ----------------------------------- |
+| `--batch-size`   | `16`          | Batch size                          |
+| `--lr`           | `3e-4`        | Peak learning rate                  |
+| `--min-lr`       | `3e-5`        | Final learning rate after cosine decay |
+| `--warmup-steps` | `500`         | Linear warmup steps                 |
+| `--weight-decay` | `0.1`         | AdamW weight decay                  |
+| `--grad-clip`    | `1.0`         | Max gradient norm (`0` disables)    |
+| `--test-split`   | `0.1`         | Fraction of data used for test loss |
+| `--seed`         | `42`          | Random seed                         |
+| `--output-dir`   | `checkpoints` | Directory for the best checkpoint   |
+| `--device`       | `auto`        | `auto`, `cpu`, or `cuda`            |
+
+### Notes
+
+- The optimizer and learning-rate schedule **start fresh**; only model weights are loaded from `--checkpoint`.
+- Use the **same model architecture** as when the checkpoint was created (`models/model.py` must match).
+- At startup, the script prints the loaded checkpoint path and its saved epoch (if present).
+
+---
+
 
 
 ## Test a checkpoint with a prompt
@@ -261,7 +351,8 @@ python prompt.py --prompt "<bos>Problem: 9 * 6; Answer:"
 | -------------------------------------------- | ------------------------------------ |
 | `Generating_data/level_1_generating_data.py` | Generates Level 1 math JSONL data    |
 | `Generating_data/math_curriculum.jsonl`      | Example generated dataset            |
-| `train.py`                                   | Training script                      |
+| `train.py`                                   | Training script (train from scratch) |
+| `train_model.py`                             | Continue training from a checkpoint  |
 | `models/model.py`                            | Model definition and hyperparameters |
 | `checkpoints/best_model.pt`                  | Saved best model after training      |
 
