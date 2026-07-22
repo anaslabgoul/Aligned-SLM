@@ -59,6 +59,8 @@ from prompt import (  # noqa: E402
     select_device,
 )
 
+import wandb_logging  # noqa: E402
+
 DEFAULT_MODEL = PROJECT_ROOT / "models" / "model.py"
 DEFAULT_CHECKPOINT = PROJECT_ROOT / "checkpoints" / "best_model.pt"
 
@@ -158,6 +160,15 @@ def parse_args():
         "--save-report",
         default=None,
         help="Optional path to write a JSON report of the results.",
+    )
+    wandb_logging.add_wandb_args(parser)
+    parser.add_argument(
+        "--wandb-run-id",
+        default=None,
+        help=(
+            "Attach these results to an existing W&B run (the run id of the "
+            "training run that produced this checkpoint) instead of creating a new one."
+        ),
     )
     return parser.parse_args()
 
@@ -337,6 +348,69 @@ def print_report(level, num_samples, decoding, results):
                 print()
 
 
+def log_results_to_wandb(run, level, results):
+    """Send per-operation accuracy to W&B as metrics, a table, and summary values."""
+    if run is None:
+        return
+
+    metrics = {}
+    total_correct = 0
+    total_count = 0
+    rows = []
+    for name, data in results.items():
+        metrics[f"eval/{name}/accuracy"] = data["accuracy"]
+        total_correct += data["correct"]
+        total_count += data["total"]
+        rows.append([name, data["correct"], data["total"], data["accuracy"]])
+
+    overall = (total_correct / total_count * 100) if total_count else 0.0
+    metrics["eval/overall/accuracy"] = overall
+
+    wandb_logging.log(run, metrics)
+    wandb_logging.log_table(
+        run,
+        f"eval/level_{level}/per_operation",
+        ["operation", "correct", "total", "accuracy"],
+        rows,
+    )
+
+    # A bar chart is easier to read than five separate scalar panels.
+    import wandb
+
+    wandb_logging.log(
+        run,
+        {
+            f"eval/level_{level}/accuracy_chart": wandb.plot.bar(
+                wandb.Table(
+                    columns=["operation", "accuracy"],
+                    data=[[row[0], row[3]] for row in rows],
+                ),
+                "operation",
+                "accuracy",
+                title=f"Level {level} accuracy per operation",
+            )
+        },
+    )
+
+    summary = {f"eval_{name}_accuracy": data["accuracy"] for name, data in results.items()}
+    summary["eval_overall_accuracy"] = overall
+    wandb_logging.summary(run, summary)
+
+    # Example failures, when --show-errors collected any.
+    error_rows = [
+        [name, err["problem"], err["expected"], err["predicted"]]
+        for name, data in results.items()
+        for err in data["errors"]
+    ]
+    if error_rows:
+        wandb_logging.log_table(
+            run,
+            f"eval/level_{level}/errors",
+            ["operation", "problem", "expected", "predicted"],
+            error_rows,
+        )
+
+
 def main():
     args = parse_args()
     if args.num_samples < 1:
@@ -354,24 +428,45 @@ def main():
     }
     decoding = "greedy" if args.temperature == 0 else f"T={args.temperature}"
 
+    run = wandb_logging.init_run(
+        args,
+        config={
+            "checkpoint": str(checkpoint_path),
+            "device": str(device),
+            "decoding": decoding,
+            "evaluated_operations": list(operations),
+        },
+        job_type="eval",
+        run_id=args.wandb_run_id,
+        # Attaching to a training run means eval metrics land on that run rather
+        # than a separate one, so accuracy sits next to the loss curves.
+        resume="allow" if args.wandb_run_id else None,
+    )
+
     print(f"Device: {device}")
     print(f"Checkpoint: {checkpoint_path}")
     print(f"Level {args.level} | operations: {', '.join(operations)}")
+    if run is not None:
+        print(f"Tracking evaluation on W&B: {wandb_logging.run_location(run)}")
 
-    results = {}
-    for name, (generator, kind) in operations.items():
-        print(f"Evaluating {name} ({args.num_samples} samples)...")
-        correct, errors = evaluate_operation(
-            name, generator, kind, model, args.num_samples, gen_kwargs, args.show_errors
-        )
-        results[name] = {
-            "correct": correct,
-            "total": args.num_samples,
-            "accuracy": (correct / args.num_samples * 100) if args.num_samples else 0.0,
-            "errors": errors,
-        }
+    try:
+        results = {}
+        for name, (generator, kind) in operations.items():
+            print(f"Evaluating {name} ({args.num_samples} samples)...")
+            correct, errors = evaluate_operation(
+                name, generator, kind, model, args.num_samples, gen_kwargs, args.show_errors
+            )
+            results[name] = {
+                "correct": correct,
+                "total": args.num_samples,
+                "accuracy": (correct / args.num_samples * 100) if args.num_samples else 0.0,
+                "errors": errors,
+            }
 
-    print_report(args.level, args.num_samples, decoding, results)
+        print_report(args.level, args.num_samples, decoding, results)
+        log_results_to_wandb(run, args.level, results)
+    finally:
+        wandb_logging.finish(run)
 
     if args.save_report:
         report = {
