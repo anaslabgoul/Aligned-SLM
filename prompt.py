@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import importlib.util
+import inspect
 import sys
 from pathlib import Path
 from typing import Optional
@@ -178,15 +179,32 @@ def generate_until_eos(
     max_new_tokens: int,
     temperature: float,
     top_k: Optional[int],
+    use_cache: bool = True,
 ) -> list[int]:
+    """Generate token ids until <eos>, the token budget, or the context limit.
+
+    The KV cache makes this O(n) forward passes over one token each, instead of
+    O(n) passes over a prefix that grows every step. Models without a cache-aware
+    forward (use_cache unsupported) fall back to re-encoding the whole prefix.
+    """
     tokenizer = model.tokenizer
     token_ids = tokenizer.encode(prompt, add_bos=True, add_eos=False).tolist()
 
+    supports_cache = use_cache and "use_cache" in inspect.signature(model.forward).parameters
+    past_kvs = None
+    step_ids = token_ids
+
     for _ in range(max_new_tokens):
-        x = torch.tensor([token_ids], dtype=torch.long, device=model.device)
-        logits = model(x)[:, -1, :].squeeze(0)
-        next_token_id = sample_next_token(logits, temperature, top_k)
+        x = torch.tensor([step_ids], dtype=torch.long, device=model.device)
+        if supports_cache:
+            logits, past_kvs = model(x, past_kvs=past_kvs, use_cache=True)
+        else:
+            logits = model(x)
+        next_token_id = sample_next_token(logits[:, -1, :].squeeze(0), temperature, top_k)
         token_ids.append(next_token_id)
+        # With a cache only the new token is fed back; without one the model
+        # needs the full prefix again.
+        step_ids = [next_token_id] if supports_cache else token_ids
 
         if next_token_id == tokenizer.eos_token_id:
             break

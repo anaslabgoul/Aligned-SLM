@@ -53,9 +53,13 @@ class CharEmbedding(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.d_model = d_model
 
-    def forward(self, x):
+    def forward(self, x, pos_offset: int = 0):
+        # pos_offset is how many tokens are already in the KV cache. Without it,
+        # every incrementally decoded token would be embedded as position 0.
         seq_len = x.size(1)
-        position = torch.arange(seq_len, dtype=torch.long, device=x.device)
+        position = torch.arange(
+            pos_offset, pos_offset + seq_len, dtype=torch.long, device=x.device
+        )
 
         tok_embed = self.token_embedding(x)
         pos_embed = self.position_embedding(position)
