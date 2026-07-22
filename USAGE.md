@@ -24,16 +24,24 @@ Activate the virtual environment (recommended):
 source venv/bin/activate
 ```
 
-Install dependencies if needed:
+Install dependencies:
 
 ```bash
-pip install torch sympy
+pip install -r requirements.txt
 ```
 
-Experiment tracking is optional. Install it only if you want it:
+For GPU training, install the CUDA build of PyTorch **first** — plain PyPI serves
+the CPU-only wheel:
 
 ```bash
-pip install wandb
+pip install torch --index-url https://download.pytorch.org/whl/cu130
+pip install -r requirements.txt
+```
+
+Experiment tracking is optional; everything runs without it. To use it,
+authenticate once:
+
+```bash
 wandb login
 ```
 
@@ -668,5 +676,6 @@ Drop the `--wandb` flags from steps 3 and 5 to run without any tracking.
 | `prompt.py`                                  | Generate text from a trained checkpoint |
 | `evaluate_model.py`                          | Per-operation accuracy evaluation    |
 | `wandb_logging.py`                           | Optional Weights & Biases experiment tracking |
+| `requirements.txt`                           | Python dependencies                  |
 
 
