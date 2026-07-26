@@ -25,7 +25,9 @@ def parse_args():
         help="Path to a checkpoint .pt file containing model_state_dict.",
     )
     training_common.add_common_args(parser)
-    return parser.parse_args()
+    args = parser.parse_args()
+    training_common.check_data_args(parser, args)
+    return args
 
 
 def load_pretrained_checkpoint(model, checkpoint_path: Path, device: torch.device):

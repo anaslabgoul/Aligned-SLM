@@ -17,7 +17,9 @@ def parse_args():
         description="Train a character-level language model on JSONL data."
     )
     training_common.add_common_args(parser)
-    return parser.parse_args()
+    args = parser.parse_args()
+    training_common.check_data_args(parser, args)
+    return args
 
 
 def main():

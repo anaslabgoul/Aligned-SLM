@@ -119,7 +119,7 @@ Training is launched with `train.py`. You must pass:
 | Argument   | Description                                       |
 | ---------- | ------------------------------------------------- |
 | `--model`  | Path to the model module (e.g. `models/model.py`) |
-| `--data`   | Path to a `.jsonl` or `.json` dataset             |
+| `--data`   | Path to a `.jsonl` or `.json` dataset (repeatable — see [Train on a mix of datasets](#train-on-a-mix-of-datasets)) |
 | `--epochs` | Number of training epochs                         |
 
 
@@ -162,6 +162,9 @@ python train.py --model models/model.py --data Generating_data/math_curriculum.j
 | ------------------- | ------------- | -------------------------------------------------- |
 | `--batch-size`      | `32`          | Batch size                                         |
 | `--lr`              | `3e-4`        | Learning rate                                      |
+| `--weight`          | equal split   | Share of the mix per `--data` file — see [Train on a mix of datasets](#train-on-a-mix-of-datasets) |
+| `--mix-total`       | largest that fits | Total samples drawn across all `--data` files  |
+| `--mix-replace`     | off           | Allow sampling with replacement when mixing        |
 | `--test-split`      | `0.1`         | Fraction of data used for test loss                |
 | `--seed`            | `42`          | Random seed                                        |
 | `--evals-per-epoch` | `0`           | Evaluate N times per epoch instead of only at epoch end |
@@ -238,6 +241,90 @@ In W&B, mid-epoch points carry `test/partial = 1` and full-test-set points carry
 
 ---
 
+## Train on a mix of datasets
+
+`--data` is repeatable. Pass it several times and the run trains on all of those
+files at once; add one `--weight` per file to choose how much of the mix each one
+contributes. This works identically on `train.py` and on `train_model.py`, so a
+checkpoint can be continued on a mix rather than on a single level.
+
+Weights are **relative**, not percentages — they are normalized for you, so
+`--weight 3 --weight 1` and `--weight 75 --weight 25` both mean 75% / 25%:
+
+```bash
+python train.py \
+  --model models/model.py \
+  --data level_1_data.jsonl --weight 3 \
+  --data level_2_data.jsonl --weight 1 \
+  --epochs 5
+```
+
+The `--data` / `--weight` pairs are matched **in order**, so keep them adjacent as
+above for readability. Omit `--weight` entirely to split the mix evenly.
+
+Every run prints the realized mix before training starts:
+
+```text
+Dataset mix:
+  level_1_data.jsonl: weight=0.7500 | sampled=750/1000000 (75.0% of mix)
+  level_2_data.jsonl: weight=0.2500 | sampled=250/1000000 (25.0% of mix)
+  total mixed samples: 1000
+```
+
+### Choosing the mix size
+
+Weights fix the *ratio*; `--mix-total` fixes the *size*.
+
+- **With `--mix-total N`** the mix has exactly `N` samples, split by the weights
+  (remainders go to the largest fractional shares).
+- **Without it** the mix is the largest one that respects the ratio without
+  reusing any sample — i.e. it is capped by whichever source runs out first. Two
+  sources at 3:1 where the small one has 250 lines gives 750 + 250 = 1000
+  samples, no matter how big the other file is.
+
+```bash
+# 8000 samples: 50% level 1, 30% level 2, 20% level 3
+python train_model.py \
+  --model models/model.py \
+  --checkpoint checkpoints/model_2.pt \
+  --data level_1_data.jsonl --weight 5 \
+  --data level_2_data.jsonl --weight 3 \
+  --data level_3_data.jsonl --weight 2 \
+  --mix-total 8000 \
+  --epochs 3
+```
+
+Sampling is done **without replacement** and is seeded by `--seed`, so the same
+command always produces the same mix. If a source is too small for the share you
+asked for, the run stops with a message naming it. Pass `--mix-replace` to
+oversample that source instead — useful for deliberately over-weighting a small
+hard set, at the cost of the model seeing those lines several times per epoch.
+
+The samples are shuffled together before the `--test-split` is taken, so the test
+set follows the same proportions as the training set.
+
+### Why mix instead of training level by level
+
+Training a checkpoint on level 2 alone lets it forget level 1. Keeping a slice of
+the earlier level in the mix — say `--weight 1` level 1 against `--weight 3`
+level 2 — is the usual guard against that. Check the effect with
+`evaluate_model.py` on **both** levels after the run, not just the new one.
+
+### Mix flags
+
+| Flag             | Default        | Description                                                        |
+| ---------------- | -------------- | ------------------------------------------------------------------ |
+| `--data`         | required       | Dataset path; repeat for a mix                                     |
+| `--weight`       | equal split    | Relative share for the matching `--data`, normalized across all     |
+| `--mix-total`    | largest that fits | Total samples drawn across all sources                           |
+| `--mix-replace`  | off            | Allow sampling with replacement so a small source can be oversampled |
+
+With `--wandb`, the run config records `dataset` (all paths) and `dataset_mix`
+(samples actually drawn per file), so the mix is visible and filterable in the
+dashboard alongside the loss curves.
+
+---
+
 ## Continue training from a checkpoint
 
 Use `train_model.py` to keep training a model that was already saved with `train.py` (or a previous run of `train_model.py`). It loads the weights from a `.pt` checkpoint, then trains on a new dataset for more epochs.
@@ -248,7 +335,7 @@ Required arguments (everything from `train.py`, plus `--checkpoint`):
 | -------------- | -------------------------------------------------------- |
 | `--model`      | Path to the model module (e.g. `models/model.py`)        |
 | `--checkpoint` | Path to a saved checkpoint (e.g. `checkpoints/model_1.pt`) |
-| `--data`       | Path to a `.jsonl` or `.json` dataset                    |
+| `--data`       | Path to a `.jsonl` or `.json` dataset (repeatable — see [Train on a mix of datasets](#train-on-a-mix-of-datasets)) |
 | `--epochs`     | Number of additional training epochs                     |
 
 The checkpoint must contain a `model_state_dict` key (same format as `checkpoints/best_model.pt`).
@@ -315,6 +402,9 @@ Same as `train.py`:
 | `--warmup-steps` | `500`         | Linear warmup steps                 |
 | `--weight-decay` | `0.1`         | AdamW weight decay                  |
 | `--grad-clip`    | `1.0`         | Max gradient norm (`0` disables)    |
+| `--weight`       | equal split   | Share of the mix per `--data` file  |
+| `--mix-total`    | largest that fits | Total samples drawn across all `--data` files |
+| `--mix-replace`  | off           | Allow sampling with replacement when mixing |
 | `--test-split`      | `0.1`      | Fraction of data used for test loss |
 | `--seed`            | `42`       | Random seed                         |
 | `--evals-per-epoch` | `0`        | Evaluate N times per epoch          |
@@ -671,6 +761,7 @@ Drop the `--wandb` flags from steps 3 and 5 to run without any tracking.
 | `train.py`                                   | Training script (train from scratch) |
 | `train_model.py`                             | Continue training from a checkpoint  |
 | `training_common.py`                         | Shared data loading, model building, and training loop |
+| `dataset_mix.py`                             | Loads and proportionally mixes several JSONL datasets |
 | `models/model.py`                            | Model definition and hyperparameters |
 | `checkpoints/best_model.pt`                  | Saved best model after training      |
 | `prompt.py`                                  | Generate text from a trained checkpoint |

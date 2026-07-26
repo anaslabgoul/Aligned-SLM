@@ -9,7 +9,6 @@ share lives here so the two scripts cannot drift apart.
 from __future__ import annotations
 
 import importlib.util
-import json
 import math
 import random
 import sys
@@ -19,6 +18,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset, random_split
 
+import dataset_mix
 import wandb_logging
 
 
@@ -41,7 +41,41 @@ def add_common_args(parser):
     parser.add_argument(
         "--data",
         required=True,
-        help="Path to a JSON or JSONL dataset file.",
+        action="append",
+        metavar="PATH",
+        help=(
+            "Path to a JSON or JSONL dataset file. Repeat it to train on a mix "
+            "of datasets, and pair it with --weight to set each one's share."
+        ),
+    )
+    parser.add_argument(
+        "--weight",
+        type=float,
+        action="append",
+        metavar="W",
+        help=(
+            "Share of the mix taken from the matching --data file, in the same "
+            "order. Weights are normalized, so '--weight 3 --weight 1' means "
+            "75%%/25%%. Omit for an equal split."
+        ),
+    )
+    parser.add_argument(
+        "--mix-total",
+        type=int,
+        default=None,
+        help=(
+            "Total number of samples to draw across all --data files. Without "
+            "it, the mix is the largest one that respects the weights without "
+            "reusing any sample."
+        ),
+    )
+    parser.add_argument(
+        "--mix-replace",
+        action="store_true",
+        help=(
+            "Allow sampling with replacement, so a source smaller than its "
+            "share is oversampled instead of raising an error."
+        ),
     )
     parser.add_argument(
         "--epochs",
@@ -194,47 +228,18 @@ def build_model(module):
     return model_cls(**init_kwargs)
 
 
-def extract_text(record, line_number: int) -> str:
-    if isinstance(record, str):
-        return record
-    if isinstance(record, dict) and "text" in record:
-        return record["text"]
-    raise ValueError(
-        f"Record at line {line_number} must contain a 'text' field or be a string."
-    )
+def check_data_args(parser, args):
+    """Report a mismatched --data / --weight pairing as a CLI error, not a traceback."""
+    try:
+        dataset_mix.resolve_source_weights(args.data, args.weight)
+    except ValueError as error:
+        parser.error(str(error))
 
 
-def load_dataset_records(data_path: Path) -> list[str]:
-    suffix = data_path.suffix.lower()
-    records = []
-
-    if suffix == ".jsonl":
-        with data_path.open(encoding="utf-8") as handle:
-            for line_number, line in enumerate(handle, start=1):
-                line = line.strip()
-                if not line:
-                    continue
-                record = json.loads(line)
-                records.append(extract_text(record, line_number))
-    elif suffix == ".json":
-        with data_path.open(encoding="utf-8") as handle:
-            payload = json.load(handle)
-        if isinstance(payload, list):
-            for index, record in enumerate(payload, start=1):
-                records.append(extract_text(record, index))
-        elif isinstance(payload, dict) and "text" in payload:
-            records.append(extract_text(payload, 1))
-        else:
-            raise ValueError(
-                "JSON file must be a list of records or a single object with a 'text' field."
-            )
-    else:
-        raise ValueError("Data file must be .json or .jsonl")
-
-    if not records:
-        raise ValueError(f"No training samples found in {data_path}")
-
-    return records
+def resolve_data_sources(args) -> list[tuple[Path, float]]:
+    """Turn the --data / --weight arguments into (path, normalized weight) pairs."""
+    pairs = dataset_mix.resolve_source_weights(args.data, args.weight)
+    return [(resolve_path(path_str), weight) for path_str, weight in pairs]
 
 
 class TextDataset(Dataset):
@@ -339,8 +344,14 @@ class TrainingSetup:
         self.device = select_device(args.device)
         self.model.to(self.device)
 
-        self.data_path = resolve_path(args.data)
-        texts = load_dataset_records(self.data_path)
+        self.data_sources = resolve_data_sources(args)
+        self.data_paths = [path for path, _ in self.data_sources]
+        texts, self.mix_report = dataset_mix.load_mixed_texts(
+            self.data_sources,
+            mix_total=args.mix_total,
+            seed=args.seed,
+            replace=args.mix_replace,
+        )
         full_dataset = TextDataset(texts, self.model.tokenizer)
 
         if len(full_dataset) < 2:
@@ -385,15 +396,22 @@ class TrainingSetup:
         )
 
     def wandb_config(self) -> dict:
-        return wandb_logging.run_config(
+        config = wandb_logging.run_config(
             self.model_module,
             self.model,
             self.device,
-            self.data_path,
+            ", ".join(str(path) for path in self.data_paths),
             self.train_size,
             self.test_size,
             self.total_steps,
         )
+        if len(self.mix_report) > 1:
+            # Record the realized mix, not just the requested weights, so runs
+            # stay comparable when a source was too small to fill its share.
+            config["dataset_mix"] = {
+                item["path"]: item["sampled"] for item in self.mix_report
+            }
+        return config
 
 
 def setup(args) -> TrainingSetup:
@@ -556,6 +574,8 @@ def save_checkpoint(path: Path, model, epoch: int, train_loss: float, test_loss:
 
 def print_setup(args, setup: TrainingSetup, best_checkpoint: Path, run=None):
     print(f"Device: {setup.device}")
+    if len(setup.mix_report) > 1 or args.mix_total is not None:
+        print(dataset_mix.format_mix_report(setup.mix_report))
     print(f"Training samples: {setup.train_size}")
     print(f"Test samples: {setup.test_size}")
     print(
