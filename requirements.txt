@@ -2,11 +2,14 @@
 #
 # For GPU training, install torch from the CUDA index FIRST, then run the line
 # above — plain PyPI serves the CPU-only wheel:
-#   pip install torch --index-url https://download.pytorch.org/whl/cu130
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+#
+# On Python 3.9 pip caps torch at 2.8.0 and numpy at 2.0.2; newer releases of
+# both need Python >= 3.10.
 
-torch>=2.12.1
-numpy>=2.5.0
-sympy>=1.14.0
+torch>=2.4
+numpy>=1.26
+sympy>=1.12
 
 # Only needed for experiment tracking (--wandb). Everything runs without it.
-wandb>=0.28.1
+wandb>=0.17
