@@ -1,0 +1,40 @@
+{
+  "model": "/users/eleves-a/2024/anas.labgoul/Aligned-SLM/models/model.py",
+  "checkpoint": "/users/eleves-a/2024/anas.labgoul/Aligned-SLM/checkpoints/model_3.pt",
+  "level": 1,
+  "num_samples": 1000,
+  "decoding": "greedy",
+  "seed": 42,
+  "operations": {
+    "integer_arithmetic": {
+      "correct": 996,
+      "total": 1000,
+      "accuracy": 99.6,
+      "errors": []
+    },
+    "integer_chain": {
+      "correct": 888,
+      "total": 1000,
+      "accuracy": 88.8,
+      "errors": []
+    },
+    "fraction_arithmetic": {
+      "correct": 896,
+      "total": 1000,
+      "accuracy": 89.60000000000001,
+      "errors": []
+    },
+    "fraction_simplify": {
+      "correct": 991,
+      "total": 1000,
+      "accuracy": 99.1,
+      "errors": []
+    },
+    "linear_simplify": {
+      "correct": 901,
+      "total": 1000,
+      "accuracy": 90.10000000000001,
+      "errors": []
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "model": "/users/eleves-a/2024/anas.labgoul/Aligned-SLM/models/model.py",
+  "checkpoint": "/users/eleves-a/2024/anas.labgoul/Aligned-SLM/checkpoints/model_3.pt",
+  "level": 2,
+  "num_samples": 1000,
+  "decoding": "greedy",
+  "seed": 42,
+  "operations": {
+    "polynomial_expand": {
+      "correct": 718,
+      "total": 1000,
+      "accuracy": 71.8,
+      "errors": []
+    },
+    "polynomial_sum": {
+      "correct": 989,
+      "total": 1000,
+      "accuracy": 98.9,
+      "errors": []
+    },
+    "distributive": {
+      "correct": 961,
+      "total": 1000,
+      "accuracy": 96.1,
+      "errors": []
+    },
+    "mixed_chain": {
+      "correct": 596,
+      "total": 1000,
+      "accuracy": 59.599999999999994,
+      "errors": []
+    },
+    "linear_solve": {
+      "correct": 911,
+      "total": 1000,
+      "accuracy": 91.10000000000001,
+      "errors": []
+    }
+  }
+}
