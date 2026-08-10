@@ -416,4 +416,4 @@ def append_fraction_simplify_samples(num_samples, filename="level_1_data.jsonl")
 
 
 if __name__ == "__main__":
-    build_dataset(1000000, filename="level_1_data.jsonl")
+    build_dataset(100000, filename="level_1_data.jsonl")

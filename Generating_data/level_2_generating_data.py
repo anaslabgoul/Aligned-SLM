@@ -720,4 +720,4 @@ def build_dataset(num_samples, filename="level_2_data.jsonl"):
 
 
 if __name__ == "__main__":
-    build_dataset(100, filename="level_2_data.jsonl")
+    build_dataset(100000, filename="level_2_data.jsonl")
