@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aligned-SLM · Math Reasoning Playground</title>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --bg-2: #121826;
+    --panel: rgba(23, 31, 48, 0.72);
+    --panel-solid: #171f30;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --text: #e8ecf5;
+    --muted: #8a94ad;
+    --faint: #5c6580;
+    --accent: #6ea8fe;
+    --accent-2: #a78bfa;
+    --accent-grad: linear-gradient(135deg, #6ea8fe 0%, #a78bfa 60%, #f0a6d0 100%);
+    --good: #4ade80;
+    --good-dim: rgba(74, 222, 128, 0.14);
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --num: #7dd3fc;
+    --var: #f0a6d0;
+    --op: #fbbf24;
+    --shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.7);
+    --radius: 16px;
+    --mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, "Cascadia Code", Consolas, monospace;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  [data-theme="light"] {
+    --bg: #eef1f7;
+    --bg-2: #e4e9f2;
+    --panel: rgba(255, 255, 255, 0.85);
+    --panel-solid: #ffffff;
+    --border: rgba(15, 23, 42, 0.09);
+    --border-strong: rgba(15, 23, 42, 0.16);
+    --text: #1a2234;
+    --muted: #566178;
+    --faint: #8894ab;
+    --accent: #3b6fd6;
+    --accent-2: #7c53e6;
+    --good: #16a34a;
+    --good-dim: rgba(22, 163, 74, 0.12);
+    --num: #0369a1;
+    --var: #b83280;
+    --op: #b45309;
+    --shadow: 0 18px 40px -22px rgba(30, 41, 59, 0.4);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    color: var(--text);
+    background:
+      radial-gradient(1200px 600px at 12% -10%, rgba(110, 168, 254, 0.14), transparent 60%),
+      radial-gradient(1000px 500px at 100% 0%, rgba(167, 139, 250, 0.12), transparent 55%),
+      var(--bg);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  a { color: var(--accent); }
+
+  /* ---------- Layout ---------- */
+  .topbar {
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px 26px;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+    position: sticky; top: 0; z-index: 20;
+    background: linear-gradient(to bottom, var(--bg-2), transparent);
+  }
+  .brand { display: flex; align-items: center; gap: 13px; }
+  .logo {
+    width: 42px; height: 42px; border-radius: 12px;
+    background: var(--accent-grad);
+    display: grid; place-items: center;
+    font-weight: 800; font-size: 20px; color: #0b0f1a;
+    box-shadow: 0 8px 22px -8px rgba(110, 168, 254, 0.7);
+  }
+  .brand h1 { font-size: 17px; margin: 0; letter-spacing: -0.2px; }
+  .brand p { margin: 0; font-size: 12.5px; color: var(--muted); }
+  .spacer { flex: 1; }
+  .pill {
+    font-size: 12px; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 6px 12px; display: inline-flex; gap: 7px; align-items: center;
+    background: var(--panel);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+  .dot.on { background: var(--good); box-shadow: 0 0 10px var(--good); }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 11px;
+    border: 1px solid var(--border); background: var(--panel);
+    color: var(--text); cursor: pointer; font-size: 17px;
+    display: grid; place-items: center; transition: .18s;
+  }
+  .icon-btn:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 348px 1fr;
+    gap: 22px;
+    max-width: 1380px;
+    margin: 22px auto;
+    padding: 0 22px 60px;
+  }
+  @media (max-width: 940px) {
+    .shell { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+  }
+  .card + .card { margin-top: 18px; }
+  .card-h {
+    padding: 15px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .card-h .t { font-weight: 650; font-size: 14px; letter-spacing: .2px; }
+  .card-h .num-badge {
+    width: 22px; height: 22px; border-radius: 7px; font-size: 12px; font-weight: 700;
+    background: var(--good-dim); color: var(--good); display: grid; place-items: center;
+  }
+  .card-b { padding: 18px; }
+
+  label.field { display: block; margin-bottom: 15px; }
+  label.field:last-child { margin-bottom: 0; }
+  .lbl { display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--muted); margin-bottom: 7px; font-weight: 500; }
+  .lbl b { color: var(--accent); font-family: var(--mono); font-weight: 600; }
+
+  select, input[type="text"], input[type="number"], textarea {
+    width: 100%; font-family: var(--sans); font-size: 14px;
+    color: var(--text); background: var(--bg-2);
+    border: 1px solid var(--border); border-radius: 11px;
+    padding: 11px 12px; outline: none; transition: .16s;
+  }
+  select:focus, input:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(110, 168, 254, 0.18);
+  }
+  select { appearance: none; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a94ad' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px; }
+
+  input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 5px; border-radius: 5px;
+    background: var(--border-strong); outline: none; margin: 8px 0 2px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 17px; height: 17px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: 3px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    font-family: var(--sans); font-size: 14px; font-weight: 600;
+    border-radius: 12px; border: 1px solid var(--border-strong);
+    padding: 11px 16px; cursor: pointer; transition: .18s; color: var(--text);
+    background: var(--bg-2); width: 100%;
+  }
+  .btn:hover { transform: translateY(-1px); border-color: var(--accent); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+  .btn.primary {
+    background: var(--accent-grad); color: #0b0f1a; border: none;
+    box-shadow: 0 12px 28px -12px rgba(110, 168, 254, 0.8);
+  }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.ghost { background: transparent; }
+
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat {
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 11px; padding: 10px 12px;
+  }
+  .stat .k { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .5px; }
+  .stat .v { font-size: 15px; font-weight: 650; margin-top: 2px; font-family: var(--mono); }
+  .stat .v.accent { color: var(--accent); }
+
+  .hint { font-size: 12px; color: var(--faint); margin-top: 8px; line-height: 1.45; }
+
+  /* ---------- Problem input ---------- */
+  .prob-wrap { position: relative; }
+  textarea#problem { min-height: 92px; resize: vertical; font-size: 15.5px; font-family: var(--mono); line-height: 1.5; }
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip {
+    font-size: 12px; font-family: var(--mono); cursor: pointer;
+    border: 1px solid var(--border); background: var(--bg-2);
+    color: var(--muted); padding: 6px 11px; border-radius: 9px; transition: .15s;
+    white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  }
+  .chip:hover { color: var(--text); border-color: var(--accent); transform: translateY(-1px); }
+  .chip .lv { color: var(--accent-2); font-weight: 700; margin-right: 6px; }
+
+  .solve-row { display: flex; gap: 12px; margin-top: 16px; align-items: center; }
+  .solve-row .btn { width: auto; }
+  .solve-row .btn.primary { flex: 1; padding: 13px 20px; font-size: 15px; }
+  .kbd { font-family: var(--mono); font-size: 11px; color: var(--faint);
+    border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; }
+
+  /* ---------- Reasoning output ---------- */
+  .stage { min-height: 260px; }
+  .placeholder {
+    display: grid; place-items: center; text-align: center; padding: 60px 20px; color: var(--faint);
+  }
+  .placeholder .big { font-size: 44px; margin-bottom: 14px; opacity: .7; }
+  .placeholder h3 { margin: 0 0 6px; color: var(--muted); font-weight: 600; }
+  .placeholder p { margin: 0; font-size: 13px; max-width: 320px; }
+
+  .problem-echo {
+    font-family: var(--mono); font-size: 14.5px; color: var(--text);
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 10px;
+    padding: 13px 15px; margin-bottom: 18px;
+  }
+  .problem-echo .tag { font-family: var(--sans); font-size: 11px; text-transform: uppercase;
+    letter-spacing: .6px; color: var(--faint); display: block; margin-bottom: 5px; }
+
+  .steps-title { font-size: 12px; text-transform: uppercase; letter-spacing: .6px;
+    color: var(--muted); margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+  .steps-title .live { font-size: 10px; color: var(--good); border: 1px solid var(--good);
+    border-radius: 6px; padding: 1px 6px; letter-spacing: .5px; animation: pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity: .4; } }
+
+  .step {
+    display: flex; gap: 14px; padding: 12px 0;
+    border-bottom: 1px dashed var(--border);
+    animation: slideIn .28s ease both;
+  }
+  .step:last-child { border-bottom: none; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(6px); } }
+  .step .n {
+    flex: none; width: 27px; height: 27px; border-radius: 9px;
+    background: var(--bg-2); border: 1px solid var(--border-strong);
+    display: grid; place-items: center; font-size: 12px; font-weight: 700;
+    color: var(--muted); font-family: var(--mono); margin-top: 1px;
+  }
+  .step.cur .n { color: var(--accent); border-color: var(--accent); }
+  .step .expr { font-family: var(--mono); font-size: 15px; align-self: center;
+    word-break: break-word; }
+  .caret { display: inline-block; width: 8px; background: var(--accent);
+    margin-left: 2px; border-radius: 1px; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .answer {
+    margin-top: 20px; border-radius: 14px; padding: 18px 20px;
+    background: linear-gradient(135deg, var(--good-dim), transparent);
+    border: 1px solid var(--good);
+    display: flex; align-items: center; gap: 16px;
+    animation: pop .35s cubic-bezier(.2,.8,.3,1.4) both;
+  }
+  @keyframes pop { from { transform: scale(.96); opacity: 0; } }
+  .answer .lab { font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--good); font-weight: 700; }
+  .answer .val { font-family: var(--mono); font-size: 24px; font-weight: 700; margin-top: 3px; word-break: break-word; }
+  .answer .check { width: 40px; height: 40px; flex: none; border-radius: 12px;
+    background: var(--good); color: #06240f; display: grid; place-items: center; font-size: 22px; }
+  .answer .copy { margin-left: auto; }
+  .copy-btn { border: 1px solid var(--border-strong); background: var(--bg-2); color: var(--muted);
+    border-radius: 9px; padding: 8px 11px; cursor: pointer; font-size: 12px; transition: .15s; display: inline-flex; gap: 6px; align-items: center; }
+  .copy-btn:hover { color: var(--text); border-color: var(--accent); }
+
+  .runbar { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+  .metric { font-size: 12px; color: var(--muted); background: var(--bg-2);
+    border: 1px solid var(--border); border-radius: 9px; padding: 7px 11px;
+    display: inline-flex; gap: 7px; align-items: center; font-family: var(--mono); }
+  .metric b { color: var(--text); font-weight: 650; }
+  .metric.eos-no { border-color: var(--warn); color: var(--warn); }
+
+  .raw-toggle { margin-top: 16px; }
+  .raw-toggle summary { cursor: pointer; font-size: 12px; color: var(--faint); list-style: none; }
+  .raw-toggle summary::-webkit-details-marker { display: none; }
+  .raw-toggle summary:hover { color: var(--muted); }
+  pre.raw { font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px; overflow-x: auto; margin-top: 10px; white-space: pre-wrap; word-break: break-word; }
+
+  /* syntax colours for math */
+  .tok-num { color: var(--num); }
+  .tok-var { color: var(--var); font-style: italic; }
+  .tok-op { color: var(--op); }
+
+  /* ---------- History ---------- */
+  .hist-item { display: flex; gap: 10px; align-items: center; padding: 10px 0;
+    border-bottom: 1px dashed var(--border); cursor: pointer; }
+  .hist-item:last-child { border-bottom: none; }
+  .hist-item:hover .hp { color: var(--accent); }
+  .hp { font-family: var(--mono); font-size: 12.5px; color: var(--text); flex: 1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: .15s; }
+  .ha { font-family: var(--mono); font-size: 12px; color: var(--good); flex: none; }
+  .empty-hist { font-size: 12.5px; color: var(--faint); text-align: center; padding: 14px 0; }
+
+  /* ---------- Toast ---------- */
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--panel-solid); border: 1px solid var(--danger); color: var(--text);
+    padding: 12px 18px; border-radius: 12px; box-shadow: var(--shadow); font-size: 13.5px;
+    opacity: 0; pointer-events: none; transition: .25s; z-index: 50; max-width: 90vw; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.info { border-color: var(--accent); }
+
+  .loader { width: 15px; height: 15px; border: 2px solid rgba(11,15,26,.35);
+    border-top-color: #0b0f1a; border-radius: 50%; animation: spin .7s linear infinite; }
+  .btn:not(.primary) .loader { border: 2px solid var(--border-strong); border-top-color: var(--accent); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">Σ</div>
+      <div>
+        <h1>Math Reasoning Playground</h1>
+        <p>Aligned-SLM · character-level transformer · chain-of-thought</p>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <span class="pill"><span class="dot" id="statusDot"></span><span id="statusText">No model loaded</span></span>
+    <button class="icon-btn" id="themeBtn" title="Toggle theme">◐</button>
+  </div>
+
+  <div class="shell">
+    <!-- ============ SIDEBAR ============ -->
+    <aside>
+      <div class="card">
+        <div class="card-h"><span class="num-badge">1</span><span class="t">Model &amp; checkpoint</span></div>
+        <div class="card-b">
+          <label class="field">
+            <span class="lbl">Checkpoint</span>
+            <select id="checkpoint"></select>
+          </label>
+          <label class="field" id="customPathField" style="display:none">
+            <span class="lbl">Checkpoint path (relative to project root)</span>
+            <input type="text" id="customPath" placeholder="checkpoints/my_model.pt" />
+          </label>
+          <label class="field">
+            <span class="lbl">Model architecture</span>
+            <input type="text" id="modelPath" value="models/model.py" />
+          </label>
+          <label class="field">
+            <span class="lbl">Device</span>
+            <select id="device">
+              <option value="auto">Auto (GPU if available)</option>
+              <option value="cpu">CPU</option>
+              <option value="cuda">CUDA (GPU)</option>
+            </select>
+          </label>
+          <button class="btn" id="loadBtn">
+            <span class="txt">Load model</span>
+          </button>
+          <div id="modelInfo" style="display:none; margin-top:16px">
+            <div class="info-grid">
+              <div class="stat"><div class="k">Parameters</div><div class="v accent" id="miParams">–</div></div>
+              <div class="stat"><div class="k">Device</div><div class="v" id="miDevice">–</div></div>
+              <div class="stat"><div class="k">Layers</div><div class="v" id="miLayers">–</div></div>
+              <div class="stat"><div class="k">d_model</div><div class="v" id="miDModel">–</div></div>
+              <div class="stat"><div class="k">Test loss</div><div class="v" id="miLoss">–</div></div>
+              <div class="stat"><div class="k">Load time</div><div class="v" id="miLoad">–</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="num-badge">2</span><span class="t">Decoding settings</span></div>
+        <div class="card-b">
+          <label class="field">
+            <span class="lbl">Temperature <b id="tempVal">0.0 · greedy</b></span>
+            <input type="range" id="temperature" min="0" max="1.5" step="0.05" value="0" />
+            <div class="hint">0 = deterministic (recommended for correct answers). Higher = more varied, more mistakes.</div>
+          </label>
+          <div class="row">
+            <label class="field" style="margin-bottom:0">
+              <span class="lbl">Top-k</span>
+              <input type="number" id="topk" min="0" placeholder="off" />
+            </label>
+            <label class="field" style="margin-bottom:0">
+              <span class="lbl">Max tokens</span>
+              <input type="number" id="maxtok" value="200" min="1" max="1024" />
+            </label>
+          </div>
+          <label class="field" style="margin-top:15px; margin-bottom:0">
+            <span class="lbl">Seed <span style="color:var(--faint)">(optional, for reproducible sampling)</span></span>
+            <input type="number" id="seed" placeholder="none" />
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="t">History</span>
+          <div class="spacer" style="flex:1"></div>
+          <button class="copy-btn" id="clearHist" style="padding:5px 9px">Clear</button>
+        </div>
+        <div class="card-b" id="history"><div class="empty-hist">Solved problems appear here.</div></div>
+      </div>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main>
+      <div class="card">
+        <div class="card-h"><span class="num-badge">3</span><span class="t">Your math problem</span>
+          <div class="spacer" style="flex:1"></div>
+          <label style="display:flex; gap:7px; align-items:center; font-size:12px; color:var(--muted); cursor:pointer">
+            <input type="checkbox" id="streamToggle" checked style="width:auto" /> Live reasoning
+          </label>
+        </div>
+        <div class="card-b">
+          <div class="prob-wrap">
+            <textarea id="problem" placeholder="e.g.  Simplify (3*x + 2) - (x - 5)"></textarea>
+          </div>
+          <div class="examples" id="examples"></div>
+          <div class="solve-row">
+            <button class="btn primary" id="solveBtn"><span class="txt">Solve &amp; show reasoning</span></button>
+            <button class="btn ghost" id="stopBtn" style="display:none; width:auto">Stop</button>
+            <span class="kbd">Ctrl ⏎</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="t">Reasoning &amp; answer</span></div>
+        <div class="card-b stage" id="stage">
+          <div class="placeholder" id="placeholder">
+            <div class="big">🧮</div>
+            <h3>Ready when you are</h3>
+            <p>Load a checkpoint, type a problem, and watch the model reason step by step to the final answer.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const state = {
+    loaded: false, loadedKey: null, streaming: false, es: null,
+  };
+
+  /* ---------------- Examples (from the curriculum) ---------------- */
+  const EXAMPLES = [
+    ["1", "Calculate 7 - 5"],
+    ["1", "Simplify (3*x + 2) - (x - 5)"],
+    ["1", "What is the value of 3/9 - 2/3"],
+    ["1", "Reduce (39*x - 90) - (-16*x - 2)"],
+    ["2", "Write the expansion of (4*y + 6)^2"],
+    ["2", "Multiply out -9*(-7*x - 10)"],
+    ["2", "Determine y if y/10 = -4/5"],
+    ["3", "Write in simplest form (7*x - 5)^2 + (x - 7)"],
+    ["3", "Multiply out (-1/2)*(-6*y + 1) - 1*(10*y - 9)"],
+  ];
+
+  /* ---------------- Math syntax highlighting ---------------- */
+  function highlight(expr) {
+    // Escape HTML first, then wrap tokens.
+    const esc = expr.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return esc.replace(/(\d+(?:\.\d+)?)|([a-z])|([-+*/^=()])/gi, (m, num, varr, op) => {
+      if (num) return `<span class="tok-num">${num}</span>`;
+      if (varr) return `<span class="tok-var">${varr}</span>`;
+      if (op) return `<span class="tok-op">${op}</span>`;
+      return m;
+    });
+  }
+
+  /* ---------------- Toast ---------------- */
+  let toastTimer;
+  function toast(msg, kind) {
+    const t = $("toast");
+    t.textContent = msg;
+    t.className = "show" + (kind ? " " + kind : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (t.className = ""), 3600);
+  }
+
+  /* ---------------- Theme ---------------- */
+  const savedTheme = localStorage.getItem("slm_theme") || "dark";
+  document.documentElement.setAttribute("data-theme", savedTheme);
+  $("themeBtn").onclick = () => {
+    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("slm_theme", next);
+  };
+
+  /* ---------------- Load checkpoints list ---------------- */
+  async function loadCheckpointList() {
+    try {
+      const res = await fetch("/api/checkpoints");
+      const data = await res.json();
+      const sel = $("checkpoint");
+      sel.innerHTML = "";
+      (data.checkpoints || []).forEach((c) => {
+        const o = document.createElement("option");
+        o.value = c.path;
+        o.textContent = `${c.name}  ·  ${c.size_mb} MB`;
+        sel.appendChild(o);
+      });
+      const custom = document.createElement("option");
+      custom.value = "__custom__";
+      custom.textContent = "Custom path…";
+      sel.appendChild(custom);
+
+      if (data.default_model) $("modelPath").value = data.default_model;
+      if (!data.cuda_available) {
+        $("device").querySelector('option[value="cuda"]').disabled = true;
+      }
+      // Prefer the last used checkpoint.
+      const last = localStorage.getItem("slm_ckpt");
+      if (last && [...sel.options].some((o) => o.value === last)) sel.value = last;
+      onCheckpointChange();
+    } catch (e) {
+      toast("Could not reach the server. Is it running?");
+    }
+  }
+
+  function onCheckpointChange() {
+    const isCustom = $("checkpoint").value === "__custom__";
+    $("customPathField").style.display = isCustom ? "block" : "none";
+  }
+  $("checkpoint").onchange = () => { onCheckpointChange(); markStale(); };
+  $("customPath").oninput = markStale;
+  $("modelPath").oninput = markStale;
+  $("device").onchange = markStale;
+
+  function currentCheckpoint() {
+    const v = $("checkpoint").value;
+    return v === "__custom__" ? $("customPath").value.trim() : v;
+  }
+  function modelConfig() {
+    return {
+      checkpoint: currentCheckpoint(),
+      model: $("modelPath").value.trim() || "models/model.py",
+      device: $("device").value,
+    };
+  }
+  function configKey() {
+    const c = modelConfig();
+    return `${c.model}::${c.checkpoint}::${c.device}`;
+  }
+
+  function markStale() {
+    if (state.loadedKey && state.loadedKey !== configKey()) {
+      setStatus(false, "Config changed — reload");
+    }
+  }
+
+  function setStatus(on, text) {
+    $("statusDot").className = "dot" + (on ? " on" : "");
+    $("statusText").textContent = text;
+    state.loaded = on;
+  }
+
+  /* ---------------- Load model ---------------- */
+  async function loadModel() {
+    const cfg = modelConfig();
+    if (!cfg.checkpoint) { toast("Choose or enter a checkpoint path."); return false; }
+    const btn = $("loadBtn");
+    btn.disabled = true;
+    btn.querySelector(".txt").innerHTML = '<span class="loader"></span>';
+    setStatus(false, "Loading…");
+    try {
+      const res = await fetch("/api/load", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cfg),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "Load failed");
+      showModelInfo(data.info);
+      state.loadedKey = configKey();
+      localStorage.setItem("slm_ckpt", $("checkpoint").value);
+      setStatus(true, data.info.checkpoint_name + " · " + data.info.device);
+      toast("Model loaded · " + data.info.parameters_millions + "M params", "info");
+      return true;
+    } catch (e) {
+      setStatus(false, "Load failed");
+      toast(e.message);
+      return false;
+    } finally {
+      btn.disabled = false;
+      btn.querySelector(".txt").textContent = "Load model";
+    }
+  }
+  $("loadBtn").onclick = loadModel;
+
+  function showModelInfo(info) {
+    $("modelInfo").style.display = "block";
+    $("miParams").textContent = info.parameters_millions + "M";
+    $("miDevice").textContent = info.device;
+    $("miLayers").textContent = info.n_layers ?? "–";
+    $("miDModel").textContent = info.d_model ?? "–";
+    const loss = info.checkpoint_meta && info.checkpoint_meta.test_loss;
+    $("miLoss").textContent = loss != null ? Number(loss).toFixed(3) : "–";
+    $("miLoad").textContent = (info.load_seconds ?? "–") + "s";
+  }
+
+  /* ---------------- Decoding controls ---------------- */
+  const temp = $("temperature");
+  temp.oninput = () => {
+    const v = parseFloat(temp.value);
+    $("tempVal").textContent = v === 0 ? "0.0 · greedy" : v.toFixed(2);
+  };
+
+  function decodeParams() {
+    return {
+      temperature: parseFloat(temp.value) || 0,
+      top_k: parseInt($("topk").value) || 0,
+      max_new_tokens: parseInt($("maxtok").value) || 200,
+      seed: $("seed").value === "" ? null : parseInt($("seed").value),
+    };
+  }
+
+  /* ---------------- Examples ---------------- */
+  const exBox = $("examples");
+  EXAMPLES.forEach(([lv, p]) => {
+    const c = document.createElement("div");
+    c.className = "chip";
+    c.innerHTML = `<span class="lv">L${lv}</span>${p}`;
+    c.title = p;
+    c.onclick = () => { $("problem").value = p; $("problem").focus(); };
+    exBox.appendChild(c);
+  });
+
+  /* ---------------- Rendering the reasoning ---------------- */
+  const stage = $("stage");
+
+  function renderScaffold(problem) {
+    stage.innerHTML = `
+      <div class="problem-echo"><span class="tag">Problem</span><span id="peText">${highlight(problem)}</span></div>
+      <div class="steps-title">Reasoning steps <span class="live" id="liveTag">LIVE</span></div>
+      <div id="steps"></div>
+      <div id="answerSlot"></div>
+      <div id="runbar" class="runbar"></div>
+    `;
+  }
+
+  function renderSteps(steps, streaming) {
+    const box = $("steps");
+    if (!box) return;
+    box.innerHTML = "";
+    steps.forEach((s, i) => {
+      const isLast = i === steps.length - 1;
+      const cur = streaming && isLast;
+      const div = document.createElement("div");
+      div.className = "step" + (cur ? " cur" : "");
+      div.innerHTML = `<div class="n">${i + 1}</div>
+        <div class="expr">${highlight(s)}${cur ? '<span class="caret">&nbsp;</span>' : ""}</div>`;
+      box.appendChild(div);
+    });
+  }
+
+  function renderAnswer(final) {
+    const slot = $("answerSlot");
+    if (!slot || !final) return;
+    slot.innerHTML = `
+      <div class="answer">
+        <div class="check">✓</div>
+        <div>
+          <div class="lab">Final answer</div>
+          <div class="val">${highlight(final)}</div>
+        </div>
+        <div class="copy">
+          <button class="copy-btn" id="copyAns">⧉ Copy</button>
+        </div>
+      </div>`;
+    $("copyAns").onclick = () => {
+      navigator.clipboard.writeText(final).then(() => toast("Answer copied", "info"));
+    };
+  }
+
+  function renderRunbar(stats, raw) {
+    const bar = $("runbar");
+    if (!bar) return;
+    const eosClass = stats.hit_eos ? "" : " eos-no";
+    bar.innerHTML =
+      `<span class="metric"><b>${stats.seconds}s</b> total</span>` +
+      `<span class="metric"><b>${stats.generated_tokens}</b> tokens</span>` +
+      (stats.tokens_per_second != null ? `<span class="metric"><b>${stats.tokens_per_second}</b> tok/s</span>` : "") +
+      `<span class="metric"><b>${stats.device}</b></span>` +
+      `<span class="metric${eosClass}">${stats.hit_eos ? "✓ complete" : "⚠ hit token limit"}</span>`;
+    const details = document.createElement("details");
+    details.className = "raw-toggle";
+    details.innerHTML = `<summary>Show raw model output</summary><pre class="raw">${raw.replace(/</g,"&lt;")}</pre>`;
+    bar.appendChild(details);
+  }
+
+  // Parse the streamed continuation (text after the prompt's "step:") into steps.
+  function parseContinuation(cont) {
+    const normalized = "step:" + cont;
+    return normalized.split(";")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => s.replace(/^step\s*:/i, "").trim())
+      .filter(Boolean);
+  }
+
+  /* ---------------- Solve (streaming via SSE) ---------------- */
+  function solveStream(problem, cfg, params) {
+    const qs = new URLSearchParams({
+      checkpoint: cfg.checkpoint, model: cfg.model, device: cfg.device,
+      problem, temperature: params.temperature, top_k: params.top_k || 0,
+      max_new_tokens: params.max_new_tokens,
+    });
+    if (params.seed != null) qs.set("seed", params.seed);
+
+    let cont = "";
+    const es = new EventSource("/api/stream?" + qs.toString());
+    state.es = es;
+
+    es.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "token") {
+        cont += msg.text;
+        renderSteps(parseContinuation(cont), true);
+      } else if (msg.type === "done") {
+        const lt = $("liveTag"); if (lt) lt.remove();
+        renderSteps(msg.steps, false);
+        renderAnswer(msg.final);
+        renderRunbar(msg.stats, msg.raw);
+        addHistory(problem, msg.final);
+        finishRun();
+      } else if (msg.type === "error") {
+        toast(msg.message); finishRun();
+      } else if (msg.type === "start") {
+        showModelInfo(msg.info);
+        state.loadedKey = configKey();
+        setStatus(true, msg.info.checkpoint_name + " · " + msg.info.device);
+      }
+    };
+    es.onerror = () => {
+      if (state.streaming) { toast("Stream interrupted."); finishRun(); }
+    };
+  }
+
+  /* ---------------- Solve (non-streaming) ---------------- */
+  async function solveOnce(problem, cfg, params) {
+    try {
+      const res = await fetch("/api/solve", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...cfg, problem, ...params }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "Solve failed");
+      renderSteps(data.steps, false);
+      renderAnswer(data.final);
+      renderRunbar(data.stats, data.raw);
+      const lt = $("liveTag"); if (lt) lt.remove();
+      addHistory(problem, data.final);
+      state.loadedKey = configKey();
+      setStatus(true, "ready");
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      finishRun();
+    }
+  }
+
+  function startRun() {
+    state.streaming = true;
+    $("solveBtn").disabled = true;
+    $("solveBtn").querySelector(".txt").innerHTML = '<span class="loader"></span> Reasoning…';
+    $("stopBtn").style.display = $("streamToggle").checked ? "block" : "none";
+  }
+  function finishRun() {
+    state.streaming = false;
+    if (state.es) { state.es.close(); state.es = null; }
+    $("solveBtn").disabled = false;
+    $("solveBtn").querySelector(".txt").textContent = "Solve & show reasoning";
+    $("stopBtn").style.display = "none";
+  }
+  $("stopBtn").onclick = () => { toast("Stopped.", "info"); finishRun(); };
+
+  async function solve() {
+    const problem = $("problem").value.trim();
+    if (!problem) { toast("Type a math problem first."); $("problem").focus(); return; }
+    const cfg = modelConfig();
+    if (!cfg.checkpoint) { toast("Choose a checkpoint in the sidebar."); return; }
+
+    renderScaffold(problem);
+    startRun();
+    const params = decodeParams();
+
+    if ($("streamToggle").checked) {
+      solveStream(problem, cfg, params);
+    } else {
+      const lt = $("liveTag"); if (lt) lt.textContent = "";
+      // Ensure model is loaded for a snappy non-stream call.
+      if (state.loadedKey !== configKey()) {
+        const ok = await loadModel();
+        if (!ok) { finishRun(); return; }
+      }
+      solveOnce(problem, cfg, params);
+    }
+  }
+  $("solveBtn").onclick = solve;
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); solve(); }
+  });
+
+  /* ---------------- History (localStorage) ---------------- */
+  function getHistory() {
+    try { return JSON.parse(localStorage.getItem("slm_history") || "[]"); }
+    catch { return []; }
+  }
+  function addHistory(problem, answer) {
+    if (!answer) return;
+    let h = getHistory();
+    h = h.filter((x) => x.problem !== problem);
+    h.unshift({ problem, answer });
+    h = h.slice(0, 12);
+    localStorage.setItem("slm_history", JSON.stringify(h));
+    renderHistory();
+  }
+  function renderHistory() {
+    const box = $("history");
+    const h = getHistory();
+    if (!h.length) { box.innerHTML = '<div class="empty-hist">Solved problems appear here.</div>'; return; }
+    box.innerHTML = "";
+    h.forEach((x) => {
+      const d = document.createElement("div");
+      d.className = "hist-item";
+      d.innerHTML = `<span class="hp" title="${x.problem}">${x.problem}</span><span class="ha">${highlight(x.answer)}</span>`;
+      d.onclick = () => { $("problem").value = x.problem; $("problem").focus(); };
+      box.appendChild(d);
+    });
+  }
+  $("clearHist").onclick = () => { localStorage.removeItem("slm_history"); renderHistory(); };
+
+  /* ---------------- Init ---------------- */
+  loadCheckpointList();
+  renderHistory();
+})();
+</script>
+</body>
+</html>
