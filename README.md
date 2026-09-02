@@ -299,3 +299,130 @@ The naming convention for W&B runs is:
 
 For exact commands — generating data, training, evaluating, and running the full
 DPO workflow — see [`USAGE.md`](USAGE.md).
+
+---
+
+## Test the models locally
+
+Download the published checkpoints from the
+[models-v1 release](https://github.com/anaslabgoul/Aligned-SLM/releases/tag/models-v1)
+and place them in `checkpoints/`. With GitHub CLI:
+
+```bash
+gh release download models-v1 --repo anaslabgoul/Aligned-SLM --pattern "*.pt" --dir checkpoints
+```
+
+Verify downloads against [`assets/model-checksums.sha256`](assets/model-checksums.sha256).
+On PowerShell, `Get-FileHash checkpoints/model_4.pt -Algorithm SHA256` prints the
+hash to compare. Install the project dependencies with `python -m pip install -r requirements.txt`.
+
+The checkpoints are not required to have the same filename, but they must use the
+architecture in `models/model.py`. Start with a single problem:
+
+```bash
+python prompt.py --checkpoint checkpoints/model_3.pt --temperature 0 \
+  --prompt "Problem: Calculate 7 - 5; step:"
+python prompt.py --checkpoint checkpoints/model_4.pt --temperature 0 \
+  --prompt "Problem: Calculate 7 - 5; step:"
+```
+
+Or run the browser playground, which now labels the curriculum/SFT and DPO
+checkpoints and selects Model 4 by default when it is available:
+
+```bash
+python webapp/server.py
+```
+
+Open `http://127.0.0.1:8000`. Use **T=0** for deterministic deployed behavior and
+**T=1** to reproduce the sampling regime used to build the DPO pairs.
+
+Run the fast web-server regression tests (no checkpoint loading required):
+
+```bash
+python -m unittest webapp.test_server -v
+```
+
+For a quick evaluator smoke test:
+
+```bash
+python evaluate_model.py --checkpoint checkpoints/model_4.pt --level 1 \
+  --num-samples 20 --temperature 0 --device auto --show-errors 3
+```
+
+For the full Model 3 versus Model 4 comparison used in this README, run every
+level with the same seed. The following PowerShell commands save local JSON
+reports; add `--wandb` and `--wandb-run-name <name>` to any command if desired.
+
+```powershell
+$models = 3, 4
+$levels = 1, 2, 3
+foreach ($model in $models) {
+  foreach ($level in $levels) {
+    python evaluate_model.py `
+      --checkpoint "checkpoints/model_$model.pt" `
+      --level $level --num-samples 400 --temperature 0 `
+      --seed 42 --device auto `
+      --save-report "results/model_${model}_level_${level}_T0.json"
+
+    python evaluate_model.py `
+      --checkpoint "checkpoints/model_$model.pt" `
+      --level $level --num-samples 400 --temperature 1 `
+      --seed 42 --device auto `
+      --save-report "results/model_${model}_level_${level}_T1.json"
+  }
+}
+```
+
+`--num-samples` is per operation, not per level. The full Level 3 comparison is
+therefore compute-intensive; reduce it for a smoke test, but use 400 for reported
+numbers.
+
+## Add the model checkpoints to GitHub
+
+Models 1-4 are already published as assets in the
+[models-v1 release](https://github.com/anaslabgoul/Aligned-SLM/releases/tag/models-v1),
+alongside their checksum file. The following options explain how to publish future versions.
+
+The repository intentionally ignores `checkpoints/` because model weights are
+large binary files. Do not force-add them to ordinary Git history. Use one of the
+following approaches.
+
+### Option A: Git LFS
+
+Install [Git LFS](https://git-lfs.com/), then run from the repository root:
+
+```bash
+git lfs install
+git lfs track "checkpoints/*.pt"
+git add .gitattributes
+git add -f checkpoints/model_1.pt checkpoints/model_2.pt \
+  checkpoints/model_3.pt checkpoints/model_4.pt
+git commit -m "Publish trained model checkpoints with Git LFS"
+git push
+```
+
+Keep the `checkpoints/` rule in `.gitignore`; `git add -f` makes this publication
+explicit while preventing future temporary checkpoints from being committed by
+accident. Anyone cloning the repository should install Git LFS and run:
+
+```bash
+git lfs pull
+```
+
+### Option B: GitHub Release assets
+
+This keeps large weights out of Git history and is often cleaner for downloadable
+artifacts. With the [GitHub CLI](https://cli.github.com/) authenticated:
+
+```bash
+gh release create models-v2 \
+  checkpoints/model_1.pt checkpoints/model_2.pt \
+  checkpoints/model_3.pt checkpoints/model_4.pt \
+  --title "Aligned-SLM model checkpoints" \
+  --notes "Models 1-3 are curriculum checkpoints; Model 4 is DPO-aligned."
+```
+
+After publishing, add the release URL and SHA-256 checksums to this README so
+users can verify downloaded weights before loading them. Only load checkpoints
+from a trusted source; PyTorch checkpoint files should be treated as executable,
+untrusted artifacts unless their origin and checksum are known.

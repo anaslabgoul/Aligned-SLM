@@ -109,8 +109,25 @@
     margin: 22px auto;
     padding: 0 22px 60px;
   }
+  .shell > * { min-width: 0; }
   @media (max-width: 940px) {
-    .shell { grid-template-columns: 1fr; }
+    .shell { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 620px) {
+    .topbar { padding: 12px 14px; gap: 10px; flex-wrap: wrap; }
+    .brand { min-width: 0; flex: 1; }
+    .brand h1 { font-size: 15px; }
+    .topbar > .spacer { display: none; }
+    .card-h { flex-wrap: wrap; }
+    .brand p { display: none; }
+    .pill { max-width: 150px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .shell { margin-top: 14px; padding: 0 12px 36px; gap: 14px; }
+    .card-b { padding: 15px; }
+    .row { flex-direction: column; }
+    .solve-row { flex-wrap: wrap; }
+    .kbd { display: none; }
+    .answer { align-items: flex-start; flex-wrap: wrap; }
+    .answer .copy { margin-left: 0; width: 100%; }
   }
 
   .card {
@@ -191,6 +208,13 @@
   .stat .v.accent { color: var(--accent); }
 
   .hint { font-size: 12px; color: var(--faint); margin-top: 8px; line-height: 1.45; }
+  .model-guide {
+    margin-top: 14px; padding: 12px 13px; border-radius: 11px;
+    border: 1px solid var(--border); background: var(--bg-2);
+    font-size: 12px; color: var(--muted); line-height: 1.5;
+  }
+  .model-guide strong { color: var(--text); }
+  .model-guide .result { color: var(--good); font-family: var(--mono); }
 
   /* ---------- Problem input ---------- */
   .prob-wrap { position: relative; }
@@ -327,7 +351,7 @@
     </div>
     <div class="spacer"></div>
     <span class="pill"><span class="dot" id="statusDot"></span><span id="statusText">No model loaded</span></span>
-    <button class="icon-btn" id="themeBtn" title="Toggle theme">◐</button>
+    <button class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle color theme">◐</button>
   </div>
 
   <div class="shell">
@@ -368,6 +392,12 @@
               <div class="stat"><div class="k">Test loss</div><div class="v" id="miLoss">–</div></div>
               <div class="stat"><div class="k">Load time</div><div class="v" id="miLoad">–</div></div>
             </div>
+          </div>
+          <div class="model-guide" id="checkpointGuide">
+            <strong>Checkpoint guide</strong><br />
+            Model 3 is the curriculum/SFT baseline. Model 4 adds DPO alignment.
+            At T=1, DPO improved L1 by <span class="result">+2.10 pp</span> and L3 by
+            <span class="result">+2.75 pp</span>; greedy accuracy stayed flat.
           </div>
         </div>
       </div>
@@ -411,13 +441,14 @@
       <div class="card">
         <div class="card-h"><span class="num-badge">3</span><span class="t">Your math problem</span>
           <div class="spacer" style="flex:1"></div>
+          <span id="problemCount" style="font:11px var(--mono); color:var(--faint)">0 / 500</span>
           <label style="display:flex; gap:7px; align-items:center; font-size:12px; color:var(--muted); cursor:pointer">
             <input type="checkbox" id="streamToggle" checked style="width:auto" /> Live reasoning
           </label>
         </div>
         <div class="card-b">
           <div class="prob-wrap">
-            <textarea id="problem" placeholder="e.g.  Simplify (3*x + 2) - (x - 5)"></textarea>
+            <textarea id="problem" maxlength="500" aria-label="Math problem" placeholder="e.g.  Simplify (3*x + 2) - (x - 5)"></textarea>
           </div>
           <div class="examples" id="examples"></div>
           <div class="solve-row">
@@ -476,6 +507,21 @@
     });
   }
 
+  function escapeHtml(value) {
+    return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+
+  function checkpointLabel(checkpoint) {
+    const roles = {
+      "model_1.pt": "L1 curriculum",
+      "model_2.pt": "L1 + L2 curriculum",
+      "model_3.pt": "SFT baseline",
+      "model_4.pt": "DPO aligned",
+    };
+    return `${checkpoint.name} — ${roles[checkpoint.name] || "checkpoint"} — ${checkpoint.size_mb} MB`;
+  }
+
   /* ---------------- Toast ---------------- */
   let toastTimer;
   function toast(msg, kind) {
@@ -502,10 +548,11 @@
       const data = await res.json();
       const sel = $("checkpoint");
       sel.innerHTML = "";
-      (data.checkpoints || []).forEach((c) => {
+      const checkpoints = data.checkpoints || [];
+      checkpoints.forEach((c) => {
         const o = document.createElement("option");
         o.value = c.path;
-        o.textContent = `${c.name}  ·  ${c.size_mb} MB`;
+        o.textContent = checkpointLabel(c);
         sel.appendChild(o);
       });
       const custom = document.createElement("option");
@@ -517,9 +564,16 @@
       if (!data.cuda_available) {
         $("device").querySelector('option[value="cuda"]').disabled = true;
       }
-      // Prefer the last used checkpoint.
+      // Prefer the last used checkpoint, otherwise the newest aligned model.
       const last = localStorage.getItem("slm_ckpt");
       if (last && [...sel.options].some((o) => o.value === last)) sel.value = last;
+      else if ([...sel.options].some((o) => o.value.endsWith("model_4.pt"))) {
+        sel.value = [...sel.options].find((o) => o.value.endsWith("model_4.pt")).value;
+      }
+      if (!checkpoints.length) {
+        custom.textContent = "No checkpoints found — enter a custom path";
+        sel.value = "__custom__";
+      }
       onCheckpointChange();
     } catch (e) {
       toast("Could not reach the server. Is it running?");
@@ -613,6 +667,12 @@
     $("tempVal").textContent = v === 0 ? "0.0 · greedy" : v.toFixed(2);
   };
 
+  const problemInput = $("problem");
+  function updateProblemCount() {
+    $("problemCount").textContent = `${problemInput.value.length} / 500`;
+  }
+  problemInput.addEventListener("input", updateProblemCount);
+
   function decodeParams() {
     return {
       temperature: parseFloat(temp.value) || 0,
@@ -629,7 +689,7 @@
     c.className = "chip";
     c.innerHTML = `<span class="lv">L${lv}</span>${p}`;
     c.title = p;
-    c.onclick = () => { $("problem").value = p; $("problem").focus(); };
+    c.onclick = () => { $("problem").value = p; updateProblemCount(); $("problem").focus(); };
     exBox.appendChild(c);
   });
 
@@ -676,7 +736,9 @@
         </div>
       </div>`;
     $("copyAns").onclick = () => {
-      navigator.clipboard.writeText(final).then(() => toast("Answer copied", "info"));
+      navigator.clipboard.writeText(final)
+        .then(() => toast("Answer copied", "info"))
+        .catch(() => toast("Could not copy the answer."));
     };
   }
 
@@ -692,7 +754,7 @@
       `<span class="metric${eosClass}">${stats.hit_eos ? "✓ complete" : "⚠ hit token limit"}</span>`;
     const details = document.createElement("details");
     details.className = "raw-toggle";
-    details.innerHTML = `<summary>Show raw model output</summary><pre class="raw">${raw.replace(/</g,"&lt;")}</pre>`;
+    details.innerHTML = `<summary>Show raw model output</summary><pre class="raw">${escapeHtml(raw)}</pre>`;
     bar.appendChild(details);
   }
 
@@ -831,8 +893,15 @@
     h.forEach((x) => {
       const d = document.createElement("div");
       d.className = "hist-item";
-      d.innerHTML = `<span class="hp" title="${x.problem}">${x.problem}</span><span class="ha">${highlight(x.answer)}</span>`;
-      d.onclick = () => { $("problem").value = x.problem; $("problem").focus(); };
+      const problemText = document.createElement("span");
+      problemText.className = "hp";
+      problemText.title = x.problem;
+      problemText.textContent = x.problem;
+      const answerText = document.createElement("span");
+      answerText.className = "ha";
+      answerText.textContent = x.answer;
+      d.append(problemText, answerText);
+      d.onclick = () => { $("problem").value = x.problem; updateProblemCount(); $("problem").focus(); };
       box.appendChild(d);
     });
   }
@@ -841,6 +910,7 @@
   /* ---------------- Init ---------------- */
   loadCheckpointList();
   renderHistory();
+  updateProblemCount();
 })();
 </script>
 </body>

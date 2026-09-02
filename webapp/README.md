@@ -26,7 +26,7 @@ plus the **`torch`** the project already depends on (see
 - Python 3.10+
 - `torch` (CPU is fine; a CUDA GPU is used automatically if available)
 - At least one checkpoint in [`../checkpoints/`](../checkpoints) (e.g. `model_1.pt`,
-  `model_2.pt`, `model_3.pt`)
+  `model_2.pt`, `model_3.pt`, `model_4.pt`)
 
 ## 2. Start the app
 
@@ -117,9 +117,10 @@ assumption [`evaluate_model.py`](../evaluate_model.py) relies on.
 ## 5. Which checkpoint should I use?
 
 Later checkpoints were trained on more of the curriculum, so they handle harder
-problems. For example, `model_1.pt` was trained mainly on Level 1 and will give
-wrong answers on Level 2/3 expansions, while `model_3.pt` handles all three
-levels. Load different checkpoints and compare — that is what the app is for.
+problems. `model_1.pt` covers Level 1, `model_2.pt` adds Level 2, and `model_3.pt`
+is the SFT curriculum baseline across all three levels. `model_4.pt` adds DPO
+alignment and is selected by default when available. DPO's measured benefit is
+mainly visible under T=1 sampling; greedy T=0 accuracy remains essentially flat.
 
 ## 6. Endpoints (for reference)
 

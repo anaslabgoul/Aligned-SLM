@@ -58,6 +58,8 @@ from prompt import (  # noqa: E402
 
 DEFAULT_MODEL_ARG = "models/model.py"
 CHECKPOINTS_DIR = PROJECT_ROOT / "checkpoints"
+MAX_REQUEST_BYTES = 64 * 1024
+MAX_PROBLEM_CHARS = 500
 
 
 # ---------------------------------------------------------------------------
@@ -194,9 +196,18 @@ def _apply_seed(seed):
         torch.manual_seed(int(seed))
 
 
+def _params_for_model(params: dict, model) -> dict:
+    """Clamp model-dependent decoding values before sampling."""
+    clean = dict(params)
+    if clean.get("top_k") is not None:
+        clean["top_k"] = min(clean["top_k"], model.tokenizer.vocab_size)
+    return clean
+
+
 def solve(entry: dict, problem: str, params: dict) -> dict:
     """Non-streaming solve. Returns structured steps + timing stats."""
     model = entry["model"]
+    params = _params_for_model(params, model)
     prompt = build_prompt(normalize_prompt(problem))
 
     with entry["lock"]:
@@ -236,6 +247,7 @@ def stream_solve(entry: dict, problem: str, params: dict):
     so the UI can type out the reasoning live.
     """
     model = entry["model"]
+    params = _params_for_model(params, model)
     tokenizer = model.tokenizer
     prompt = build_prompt(normalize_prompt(problem))
     token_ids = tokenizer.encode(prompt, add_bos=True, add_eos=False).tolist()
@@ -333,7 +345,7 @@ def clean_params(src: dict) -> dict:
         except (TypeError, ValueError):
             return default
 
-    temperature = max(0.0, as_float(src.get("temperature"), 0.0))
+    temperature = min(max(0.0, as_float(src.get("temperature"), 0.0)), 5.0)
 
     top_k_raw = src.get("top_k")
     top_k = as_int(top_k_raw, 0)
@@ -381,14 +393,25 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _read_json_body(self) -> dict:
-        length = int(self.headers.get("Content-Length", 0))
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except (TypeError, ValueError):
+            raise ValueError("Invalid Content-Length.")
+        if length < 0:
+            raise ValueError("Invalid Content-Length.")
         if not length:
             return {}
+        if length > MAX_REQUEST_BYTES:
+            self.close_connection = True
+            raise OverflowError("Request body is too large.")
         raw = self.rfile.read(length)
         try:
-            return json.loads(raw.decode("utf-8"))
-        except json.JSONDecodeError:
-            return {}
+            body = json.loads(raw.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise ValueError("Expected a JSON request body.") from exc
+        if not isinstance(body, dict):
+            raise ValueError("Expected a JSON object.")
+        return body
 
     def _resolve_model_args(self, src: dict):
         model_arg = src.get("model") or DEFAULT_MODEL_ARG
@@ -420,7 +443,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         route = urlparse(self.path).path
-        body = self._read_json_body()
+        try:
+            body = self._read_json_body()
+        except OverflowError as exc:
+            return self._send_json({"error": str(exc)}, status=413)
+        except ValueError as exc:
+            return self._send_json({"error": str(exc)}, status=400)
 
         if route == "/api/load":
             return self._handle_load(body)
@@ -461,11 +489,19 @@ class Handler(BaseHTTPRequestHandler):
     # -- API: solve (non-streaming) ----------------------------------------
     def _handle_solve(self, body: dict):
         model_arg, checkpoint_arg, device_arg = self._resolve_model_args(body)
-        problem = (body.get("problem") or "").strip()
+        problem = body.get("problem") or ""
+        if not isinstance(problem, str):
+            return self._send_json({"error": "Problem must be text."}, status=400)
+        problem = problem.strip()
         if not checkpoint_arg:
             return self._send_json({"error": "No checkpoint specified."}, status=400)
         if not problem:
             return self._send_json({"error": "Please enter a math problem."}, status=400)
+        if len(problem) > MAX_PROBLEM_CHARS:
+            return self._send_json(
+                {"error": f"Problem must be at most {MAX_PROBLEM_CHARS} characters."},
+                status=400,
+            )
         try:
             entry = REGISTRY.load(model_arg, checkpoint_arg, device_arg)
             result = solve(entry, problem, clean_params(body))
@@ -489,6 +525,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(
                 {"error": "Missing checkpoint or problem."}, status=400
             )
+        if len(problem) > MAX_PROBLEM_CHARS:
+            return self._send_json(
+                {"error": f"Problem must be at most {MAX_PROBLEM_CHARS} characters."},
+                status=400,
+            )
 
         params = clean_params(
             {
@@ -503,6 +544,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
+        self.send_header("X-Accel-Buffering", "no")
         self.send_header("Connection", "keep-alive")
         self.end_headers()
 

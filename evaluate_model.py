@@ -47,6 +47,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "Generating_data"))
 
 import level_1_generating_data as level_1  # noqa: E402
 import level_2_generating_data as level_2  # noqa: E402
+import level_3_generating_data as level_3  # noqa: E402
 
 # Reuse the model-loading and generation helpers from prompt.py so evaluation
 # decodes exactly the way single-prompt inference does.
@@ -83,6 +84,10 @@ OPERATIONS = {
         "distributive": (level_2._generate_distributive, "expression"),
         "mixed_chain": (level_2._generate_mixed_chain, "expression"),
         "linear_solve": (level_2._generate_linear_solve, "equation"),
+    },
+    3: {
+        "mixed_polynomial": (level_3._generate_mixed_polynomial, "expression"),
+        "fraction_distribute": (level_3._generate_fraction_distribute, "expression"),
     },
 }
 
