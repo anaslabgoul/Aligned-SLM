@@ -2,8 +2,10 @@
 
 A character-level language model trained **from scratch** to do step-by-step
 mathematics, then progressively taught harder material through a curriculum — and
-next, **aligned with DPO** so it prefers correct reasoning over incorrect
-reasoning.
+finally **aligned with DPO** so it prefers correct reasoning over incorrect
+reasoning. The alignment step is a careful **negative-leaning result**: DPO helps
+only under sampling and only slightly, and the [DPO section](#dpo-alignment)
+diagnoses exactly why.
 
 The project has one property that makes it unusually clean to study: **every
 answer is verifiable with SymPy**. That single fact drives the whole pipeline —
@@ -137,45 +139,139 @@ The single-step operations (integer arithmetic, fraction simplify, polynomial
 expand, distributive) are essentially solved. The **multi-step / compositional**
 operations lag at every level — `integer_chain` and `linear_simplify` in Level 1,
 `mixed_chain` in Level 2, and both Level 3 operations. Chained reasoning is the
-consistent weak point, which is exactly what alignment targets next.
+consistent weak point, and it is what the [DPO alignment](#dpo-alignment) step
+targets.
 
 ---
 
-## Next: DPO alignment
+## DPO alignment
 
-The plan is to align **Model 3** with **Direct Preference Optimization (DPO)** —
-teaching it to *prefer* correct chains over incorrect ones — using the tooling in
-this repo:
+**Model 3** was aligned with **Direct Preference Optimization (DPO)** — teaching it
+to *prefer* correct chains over incorrect ones — producing **Model 4**
+([`checkpoints/model_4.pt`](checkpoints/)). The tooling:
 
 - [`Generating_data/generate_dpo_data.py`](Generating_data/generate_dpo_data.py) —
-  samples several chains per problem, checks each with the same SymPy verifier used
-  for evaluation, and pairs a **correct** chain (`chosen`) against a **wrong** one
-  (`rejected`). No human labels.
+  samples several chains per problem at temperature 1.0, checks each with the same
+  SymPy verifier used for evaluation, and pairs a **correct** chain (`chosen`)
+  against a **wrong** one (`rejected`). No human labels — the verifier *is* the
+  labeller.
 - [`train_dpo.py`](train_dpo.py) — optimizes the DPO loss against a frozen copy of
   Model 3 as the reference.
 
-**Why this should work here.** DPO needs problems where the model produces *both* a
-correct and an incorrect chain — a "contested" problem. Level 3's ~25% pass-rate is
-close to ideal for this: pairs form easily, unlike a near-solved level where the
-model is almost always right. The weak multi-step operations in Levels 1–2
-(`integer_chain`, `linear_simplify`, `mixed_chain`) are contested too and can be
-mixed in.
+| DPO setting          | Value                                             |
+| -------------------- | ------------------------------------------------- |
+| Reference / start    | Model 3 (a frozen copy is the reference)          |
+| Preference pairs     | **634** — Level 1: 403 · Level 2: 98 · Level 3: 133 |
+| Epochs / batch size  | 3 / 8                                              |
+| β / label smoothing  | 0.1 / 0.0                                          |
+| Learning rate        | 1e-5 → 1e-6 (cosine), 50 warmup steps             |
 
-**What to watch during DPO** — reward accuracy climbing toward 1.0 and a positive,
-growing reward margin (the chosen chain pulling ahead of the rejected one) — and
-then the real test, downstream evaluation accuracy.
+### The result in one line
 
-### Model 3 → Model 3 + DPO (to be filled in)
+> **DPO helped only under sampling, and only slightly.** Under greedy decoding
+> (the deployed metric) it is flat. Under temperature-1 sampling — the same regime
+> the preference pairs were drawn from — it gives a small, consistent gain on the
+> levels with headroom. The gain is *small* because the preference data is weak, and
+> the section below shows exactly why.
 
-| Level tested | Model 3 (baseline) | Model 3 + DPO |
-| ------------ | :----------------: | :-----------: |
-| Level 1      | 72.85              | _pending_     |
-| Level 2      | 97.50              | _pending_     |
-| Level 3      | 24.62              | _pending_     |
+### Downstream accuracy — greedy (T=0) vs sampling (T=1)
 
-The key questions: **how much does Level 3 improve**, and does alignment hold Levels
-1–2 steady (no regression)? That before/after delta is the headline result the
-alignment step is meant to produce.
+Both evaluations use **400 freshly-generated problems per operation**, SymPy-checked.
+The T=1 comparison is **paired** (seed 42 → both models see identical problems and
+identical sampling noise), so the before/after delta is not confounded by problem
+draw.
+
+**Greedy decoding (T = 0) — how the model is actually deployed:**
+
+| Level tested | Model 3 | Model 4 (DPO) |    Δ    |
+| ------------ | :-----: | :-----------: | :-----: |
+| Level 1      |  72.85  |     72.80     |  −0.05  |
+| Level 2      |  97.50  |     97.65     |  +0.15  |
+| Level 3      |  24.62  |     23.50     |  −1.12  |
+
+> **Flat.** Every delta is inside evaluation noise. Under greedy decoding, DPO
+> changed essentially nothing.
+
+**Sampling (T = 1) — the regime the preference pairs came from:**
+
+| Level tested | Model 3 | Model 4 (DPO) |    Δ    | 95% CI |
+| ------------ | :-----: | :-----------: | :-----: | :----: |
+| Level 1      |  65.65  |     67.75     | **+2.10** | ±2.08 |
+| Level 2      |  96.25  |     96.70     |  +0.45  | ±0.83  |
+| Level 3      |  16.75  |     19.50     | **+2.75** | ±2.59 |
+
+> **A small but consistent gain where there is headroom.** On Level 1 *all five
+> operations improve* (a sign test on that alone is p ≈ 0.03); Level 2 is saturated
+> so there is nothing to gain; Level 3's `fraction_distribute` jumps **+6.5**. The
+> design is paired, so the true confidence interval on the difference is tighter
+> than the single-proportion ±CI shown.
+
+Per-operation, T = 1 — **Level 1** (all five improve):
+
+| Operation           | Model 3 | Model 4 (DPO) |   Δ   |
+| ------------------- | :-----: | :-----------: | :---: |
+| integer_arithmetic  |  76.75  |     78.75     | +2.00 |
+| integer_chain       |  58.75  |     60.25     | +1.50 |
+| fraction_arithmetic |  52.25  |     55.50     | +3.25 |
+| fraction_simplify   |  90.00  |     90.50     | +0.50 |
+| linear_simplify     |  50.50  |     53.75     | +3.25 |
+
+Per-operation, T = 1 — **Level 3**:
+
+| Operation           | Model 3 | Model 4 (DPO) |   Δ   |
+| ------------------- | :-----: | :-----------: | :---: |
+| mixed_polynomial    |  21.75  |     20.75     | −1.00 |
+| fraction_distribute |  11.75  |     18.25     | +6.50 |
+
+### Why the gain is small — and why greedy hides it
+
+Two findings explain the whole picture.
+
+**1. The T0/T1 split is a decoding-mismatch signature.** The preference pairs are
+the model's *sampling* mistakes (drawn at T=1). DPO pushes probability mass off
+those stochastic slips — which shows up when you sample (T=1: +2–3pp) but not when
+you decode greedily (T=0: ≈0), because greedy already takes the argmax path that
+routes *around* those slips. So the alignment did something real; greedy evaluation
+just can't see it.
+
+**2. The preference pairs are degenerate, which caps the gain.** Inspecting the 634
+pairs:
+
+- **57%** of `chosen`/`rejected` pairs differ by a **single token**;
+- **77%** differ by ≤2 tokens;
+- **61%** are identical except for the **final step**.
+
+A representative pair — identical reasoning, one wrong coefficient at the end:
+
+```
+chosen  : … 16*y^2 - 32*y + 8
+rejected: … 16*y^2 - 36*y + 8
+```
+
+Because the two chains share almost every token, the DPO gradient only sees the
+handful of digits that differ. The model learns *"prefer the token `32` over `36`
+in this exact context"* — memorising specific arithmetic substitutions rather than
+a general procedure — so the benefit barely transfers to fresh problems. The
+training dynamics agree: **train reward-accuracy hit 100% but held-out reward-
+accuracy was only 71.9%** (overfitting), the reward margin was a slim **0.088**, and
+the final implicit rewards (chosen **+0.03**, rejected **−0.18**) show DPO worked
+mostly by *suppressing* rejected chains rather than *raising* chosen ones — the
+classic likelihood-displacement footprint behind the tiny greedy regressions.
+
+> **Methods note.** A 150/50-sample pilot of the T=1 comparison gave a misleading
+> Level 3 result of **−3.0** (driven by a 3-vs-6 count on `fraction_distribute`).
+> Only at **400 samples/operation** did the paired signal (+2.75) resolve cleanly —
+> a reminder that at ~20% accuracy, small-N evaluation is dominated by noise.
+
+### What would make DPO actually help here
+
+The bottleneck is the *data*, not compute or epochs. The highest-leverage fix is to
+build `rejected` chains that are **structurally different** wrong reasoning (not
+single-digit perturbations of the chosen chain), and to rebalance the pairs toward
+Level 3 where the headroom is. Adding an NLL/SFT term on the chosen chain
+(RPO-style) would counter the likelihood displacement. For verifiable math with
+reference chains already in hand, plain reject-sampling SFT (STaR) is also a strong
+— often stronger — alternative to DPO.
 
 ---
 
