@@ -326,15 +326,7 @@ python prompt.py --checkpoint checkpoints/model_4.pt --temperature 0 \
   --prompt "Problem: Calculate 7 - 5; step:"
 ```
 
-Or run the browser playground, which now labels the curriculum/SFT and DPO
-checkpoints and selects Model 4 by default when it is available:
-
-```bash
-python webapp/server.py
-```
-
-Open `http://127.0.0.1:8000`. Use **T=0** for deterministic deployed behavior and
-**T=1** to reproduce the sampling regime used to build the DPO pairs.
+Prefer a browser interface? Follow [Using the web app](#using-the-web-app) below.
 
 Run the fast web-server regression tests (no checkpoint loading required):
 
@@ -426,3 +418,93 @@ After publishing, add the release URL and SHA-256 checksums to this README so
 users can verify downloaded weights before loading them. Only load checkpoints
 from a trusted source; PyTorch checkpoint files should be treated as executable,
 untrusted artifacts unless their origin and checksum are known.
+
+---
+
+## Using the web app
+
+The **Math Reasoning Playground** runs locally and lets you select a checkpoint,
+enter a math problem, and watch the model generate its solution step by step.
+
+### 1. Prepare the environment
+
+From the repository root, install the dependencies in your Python environment:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Download at least one `.pt` checkpoint from the
+[model release](https://github.com/anaslabgoul/Aligned-SLM/releases/tag/models-v1)
+into `checkpoints/`. See [Test the models locally](#test-the-models-locally) for
+download commands and checksum verification. No Node.js or frontend build is needed.
+
+### 2. Start the server
+
+```bash
+python webapp/server.py
+```
+
+If you use the existing Windows virtual environment, run this instead:
+
+```powershell
+.\venv\Scripts\python.exe webapp\server.py
+```
+
+Open **[http://127.0.0.1:8000](http://127.0.0.1:8000)** in your browser. Keep the
+terminal running while you use the app; press **Ctrl+C** there to stop the server.
+If port 8000 is busy, use `python webapp/server.py --port 9000` and open
+`http://127.0.0.1:9000` instead. Keep the default loopback host for local use;
+this development server is not intended for public, unauthenticated hosting.
+
+### 3. Choose and load a model
+
+- Select a **Checkpoint**: Model 1 covers Level 1; Model 2 adds Level 2;
+  Model 3 is the three-level curriculum/SFT baseline; Model 4 adds DPO alignment.
+- Model 4 is selected by default when available, unless a previous selection
+  was saved. Use **Custom path** if your checkpoint is stored elsewhere.
+- Leave **Model architecture** as `models/model.py` for the published checkpoints.
+- Set **Device** to **Auto** to use CUDA when available, otherwise CPU.
+- Click **Load model**. The app displays parameter count, architecture, device,
+  and load time. Clicking **Solve** also loads the selected model if needed.
+
+### 4. Enter a problem and generate a solution
+
+Type a problem, such as `Calculate 7 - 5` or
+`Simplify (3*x + 2) - (x - 5)`, or select an example chip labeled L1, L2, or L3.
+Enter only the question: the app adds the training-format prompt automatically.
+The input limit is 500 characters.
+
+Set the decoding controls:
+
+- **Temperature = 0**: greedy, deterministic decoding; a useful starting point.
+- **Temperature = 1**: stochastic sampling, matching the temperature used to
+  generate the DPO preference pairs. One answer is not an accuracy benchmark.
+- **Top-k**: leave blank to disable it; otherwise restrict the sampling pool.
+- **Max tokens**: caps response length; increase it if the output is truncated.
+- **Seed**: enter an integer such as `42` for reproducible sampling settings.
+
+Click **Solve & show reasoning**, or press **Ctrl+Enter** (**Cmd+Enter** on macOS).
+Leave **Live reasoning** enabled to stream the output, or disable it to receive
+the completed response at once. **Stop** closes an active stream.
+
+### 5. Read and compare the output
+
+The app displays generated steps, the last step as the **Final answer**, and
+timing/token statistics. **Copy** copies the answer; **Show raw model output**
+reveals the underlying text. Recent problems are saved in your browser's local
+history, and the theme button switches between light and dark modes.
+
+**A completed response is not necessarily correct.** The final-answer styling
+and completion indicator do not certify mathematical correctness. Use
+`evaluate_model.py` for SymPy-checked accuracy measurements.
+
+To explore DPO, solve the same problem with **Model 3**, then **Model 4**, keeping
+temperature, seed, top-k, and token limit fixed. Try both T=0 and T=1, but use the
+multi-problem evaluation commands above for quantitative conclusions.
+
+If no checkpoints appear, check that the downloaded `.pt` files are inside
+`checkpoints/`. If loading reports an architecture mismatch, restore
+`models/model.py` as the architecture and use one of the published checkpoints.
+For API endpoints and additional troubleshooting, see the
+[web app guide](webapp/README.md).
